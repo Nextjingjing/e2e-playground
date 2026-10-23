@@ -39,6 +39,14 @@ to PDF afterwards if print is needed).
 3. One capture script per document, not one-off throwaway scripts per image.
    The doc will be edited again — the next edit should mean "re-run the
    script," not "figure out how these screenshots were taken."
+4. **No credentials or personal data in any picture, script or doc.** Manuals get shared
+   and committed. Use demo accounts and fake data first; then keep `redact.cjs` (next to
+   the template) on as the safety net — it covers emails, tokens/API keys, password fields,
+   `password=…` text, URL credentials, ID/phone/card numbers and long ids with solid bars
+   before anything is painted. Add the demo user's display name and any real names you
+   expect (`redactConfig({ text: [...] })`). Read the login from environment variables
+   (`DEMO_USER` / `DEMO_PASS` in the template), never hard-code it. When you look at each
+   PNG, check headers, tables and URL bars for anything that slipped through.
 
 ## Browser: Playwright + open-source Chromium by default
 

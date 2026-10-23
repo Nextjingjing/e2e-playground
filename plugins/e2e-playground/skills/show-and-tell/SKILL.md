@@ -93,6 +93,23 @@ save. Defaults when not stated:
   a step happened are exactly the faking the user is trying to rule out.
 - Read-only DB queries to choose data and to verify the outcome are fine. Writing results
   directly to the DB is not.
+- **No credential or personal data ever reaches a frame, a file or the repo.** Videos get
+  shared and uploaded; one visible password, token or employee number cannot be taken back.
+  - The kit covers matches with solid bars before the first frame (`scripts/redact.cjs`, on by
+    default): emails, JWT/bearer/API/GitHub/AWS/Google/Slack tokens, password and token
+    fields, `password=…`-style text, credentials in URLs, Thai national ID, phone and card
+    numbers, 9+-digit ids. Opaque bars, not blur: blur is dropped from recorded frames and
+    can sometimes be reversed.
+  - Add what you know will show before recording: the test account's display name, username,
+    employee id, customer names → `startSession({ redact: { text: [...], selectors: [".user-badge"] } })`.
+    Turn it off (`redact: false`) only when every value on screen is known to be fake.
+  - Log in off camera (the kit's `login()` is never filmed). Credentials come from environment
+    variables or a file outside the repo and the output folder — never in scripts, card text,
+    captions, `FLOWS.md`, `HANDOFF.md`, review notes or commit messages (write "credentials:
+    `<path>`", not the values).
+  - Part of the review (§6): look for anything that slipped through — a name in a header, an
+    id in a table, a token in a URL bar. Fix the redaction and re-record; `post.py cover`
+    (solid bars on a finished video) is the last resort.
 
 ## 3. Protect the data before filming
 
@@ -181,8 +198,10 @@ combined video is `recordCard` + `post.py card <card.webm> intro.mp4`.
 Make one contact sheet of the key moments (`post.py sheet`, see below) and look at it:
 title card, the key action, the proof, the end state. Check in the DB (read-only)
 that what the video claims really happened. Retake if a key moment is missing, cut off by
-a popup, or unreadable. Then save what you saw so nobody looks again:
-`post.py seen <mp4> --save "0:04 card ok | 0:52 confirm popup ok | 1:31 proof row ok" --by <who>`.
+a popup, or unreadable — or if any credential or personal data is readable in any frame
+(check headers, tables, URL bars, toasts). Then save what you saw so nobody looks again,
+including the redaction check:
+`post.py seen <mp4> --save "0:04 card ok | 0:52 confirm popup ok | 1:31 proof row ok | redaction ok" --by <who>`.
 
 ### Saving tokens while you check
 

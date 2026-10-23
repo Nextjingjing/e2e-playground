@@ -67,6 +67,17 @@ first and specific routes after (later routes win). For realistic payloads, reco
 `routeFromHAR(..., { update: true })` and replay. Record every non-GET request in the stub
 and assert on it — that proves what the UI *sent*, and that nothing else was written.
 
+**Keep secrets out of tests and their artifacts.** Specs, fixtures and HAR files get
+committed; traces, videos and failure screenshots get uploaded by CI.
+- Test accounts come from environment variables / CI secrets (`process.env.E2E_USER`), never
+  from the spec; `test.skip(!process.env.E2E_USER, ...)` for live suites.
+- Stub auth with fake tokens (`"test-token"`); never paste a real JWT or cookie into a fixture.
+- A HAR recorded against a real server holds real cookies and tokens: scrub it
+  (`Authorization`, `Cookie`, `Set-Cookie`, tokens in URLs and bodies) before committing,
+  or record it against a stub.
+- Ignore `test-results/` and `playwright-report/` in git, and don't publish traces from runs
+  that used real accounts — a trace replays every typed password.
+
 **Control time.** If the screen shows times or counts down:
 - only need a fixed "now" → `page.clock.setFixedTime(...)` (Playwright's recommended first
   choice);

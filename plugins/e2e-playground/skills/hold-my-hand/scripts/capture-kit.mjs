@@ -1,18 +1,24 @@
-// Helpers for hold-my-hand screenshots. Copy next to your capture script and import:
+// Helpers for hold-my-hand screenshots. Copy this file AND redact.cjs next to your capture script:
 //   import { launch, annotate, clearMarks, around, shot } from "./capture-kit.mjs";
 // Resolve playwright from the app's own node_modules so nothing is installed globally:
 //   const { page, browser } = await launch({ appPackageJson: "/path/to/your-app/package.json", time: "2026-01-15T10:00:00Z" });
+// Credentials / personal data on screen are covered before every shot (redact: { text: ["Real Name"] }
+// to add your own; redact: false only for data you know is fake).
 import { createRequire } from "node:module";
 import fs from "node:fs";
 import path from "node:path";
 
+const { redactInit, redactConfig } = createRequire(import.meta.url)("./redact.cjs");
+
 export const NO_MOTION = "*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}";
 const ACCENT = "#b45309";
 
-export async function launch({ appPackageJson, time, timezoneId = "UTC", locale = "en-US", viewport = { width: 1680, height: 1000 } }) {
+export async function launch({ appPackageJson, time, timezoneId = "UTC", locale = "en-US", viewport = { width: 1680, height: 1000 }, redact = {} }) {
   const { chromium } = createRequire(appPackageJson)("playwright");
   const browser = await chromium.launch();
   const context = await browser.newContext({ viewport, timezoneId, locale });
+  const rc = redactConfig(redact);
+  if (rc) await context.addInitScript(redactInit, rc);
   const page = await context.newPage();
   if (time) await page.clock.install({ time: new Date(time) });
   return { browser, context, page };

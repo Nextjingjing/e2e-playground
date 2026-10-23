@@ -10,3 +10,10 @@ _raw/
 _auth-state.json
 .DS_Store
 dist/
+# never commit test credentials or artifacts that can hold them
+test-results/
+playwright-report/
+*.har
+.env
+.env.*
+*creds*.json

@@ -99,6 +99,13 @@ would cover text), `clearMarks`, `around(page, locators, pad)` for a tight clip,
 - Kill animations (the kit's `NO_MOTION` style) so shots never land mid-fade.
 - Wide tables: use a wide viewport (~1680px) so the relevant column is in frame; clip to the
   header plus the row.
+- **No credentials or personal data in pictures, steps or files.** Stub data uses made-up
+  names and ids ("Demo User", "A-042"). The kit's `launch()` also covers emails, tokens/API
+  keys, password fields, `password=…` text, URL credentials, ID/phone/card numbers and long
+  ids with solid bars (`scripts/redact.cjs`, copy it next to `capture-kit.mjs`) in case real
+  data slips in; add expected names with `launch({ redact: { text: [...] } })`. A step that
+  says which account to use names it ("the QA account") and where its password lives, never
+  the password itself.
 
 **Open every PNG before publishing.** A selector that matches the wrong element still
 "succeeds". Check the badge sits on the right element, nothing important is clipped, and the

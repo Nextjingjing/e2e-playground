@@ -15,3 +15,8 @@ Paths are relative to this repo.
 Tool-specific words in the skills map like this: "subagent" = any parallel worker your tool
 offers (another session or terminal is fine); "look at an image" = open the PNG with whatever
 image viewing your tool has. Scripts are plain Node.js / Python / ffmpeg and run in any shell.
+
+Never put credentials or personal data in anything you produce (pictures, videos, guides,
+scripts, notes, commits): keep the bundled `redact.cjs` on — it covers secrets on screen with
+solid bars before capture — and read logins from environment variables, never from files you
+write.

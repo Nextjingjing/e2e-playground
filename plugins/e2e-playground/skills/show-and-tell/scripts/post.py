@@ -8,6 +8,7 @@ usage:
   python post.py sheet <video> <out.png> [t1 t2 ...] [--width 1280]  # frames tiled in ONE image
                                                                      # (no times = 6 evenly spread)
   python post.py seen <video> [--save "what each moment shows, verdict" --by who]  # review cache
+  python post.py cover <in.mp4> <out.mp4> --box x,y,w,h[@t0-t1] ...  # solid bars on a finished video
 Prints one summary line per step; set POST_VERBOSE=1 to also print every ffmpeg command.
 
 Dead time, two sources:
@@ -36,6 +37,23 @@ def run(cmd, **kw):
     if VERBOSE:
         print(" ".join(str(c) for c in cmd)[:400])
     return subprocess.run(cmd, check=True, **kw)
+
+
+def cover(a):
+    """Solid bars over fixed areas of an already-recorded video (e.g. a header with the user's
+    name that was filmed before redaction existed). --box x,y,w,h[@t0-t1], pixels of the video."""
+    parts = []
+    for b in a.box:
+        rect, _, when = b.partition("@")
+        x, y, w, h = (int(v) for v in rect.split(","))
+        enable = ""
+        if when:
+            t0, _, t1 = when.partition("-")
+            enable = f":enable='between(t,{float(t0)},{float(t1) if t1 else 1e9})'"
+        parts.append(f"drawbox=x={x}:y={y}:w={w}:h={h}:color=0x4b5563@1:t=fill{enable}")
+    run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", a.video, "-vf", ",".join(parts),
+         "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-c:a", "copy", "-movflags", "+faststart", a.out])
+    print(f"wrote {a.out}: {len(parts)} bar(s)")
 
 
 def fingerprint(path):
@@ -305,12 +323,16 @@ def main():
     s.add_argument("out")
     s.add_argument("times", nargs="*")
     s.add_argument("--width", type=int, default=1280)
+    v = sub.add_parser("cover")
+    v.add_argument("video")
+    v.add_argument("out")
+    v.add_argument("--box", action="append", required=True)
     r = sub.add_parser("seen")
     r.add_argument("video")
     r.add_argument("--save")
     r.add_argument("--by")
     a = p.parse_args()
-    {"one": one, "card": card, "concat": concat, "sheet": sheet, "seen": seen}[a.mode](a)
+    {"one": one, "card": card, "concat": concat, "sheet": sheet, "seen": seen, "cover": cover}[a.mode](a)
 
 
 if __name__ == "__main__":

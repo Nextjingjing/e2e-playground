@@ -19,6 +19,7 @@
 //   python post.py one <outDir>/01-case.webm out/01-case.mp4 --card <outDir>/01-card.webm --seed 21
 const fs = require("fs");
 const path = require("path");
+const { redactInit, redactConfig } = require("./redact.cjs");
 
 const DEFAULT_FONT = "'Leelawadee UI','Noto Sans Thai','Sarabun','Segoe UI','Noto Sans',sans-serif";
 const DEFAULT_VIEW = { width: 1440, height: 900 };
@@ -177,7 +178,9 @@ function sizeInit(px) {
 
 // ---------- session ----------
 // opts: baseURL, outDir, name, startUrl, login(page) [run once, not recorded],
-//       storageStatePath, view, font, captionPx, projectDir, contextOptions, origin permissions
+//       storageStatePath, view, font, captionPx, projectDir, contextOptions, origin permissions,
+//       redact: { text: ["Real Name", "emp id"], selectors: [".avatar-name"], patterns: [{src, flags}] }
+//               (on by default with built-in credential/PII patterns; false = off)
 async function startSession(opts) {
   const { baseURL, outDir, name, startUrl, login } = opts;
   const view = opts.view || DEFAULT_VIEW;
@@ -212,6 +215,9 @@ async function startSession(opts) {
   });
   await context.addInitScript(overlayInit, font);
   if (opts.captionPx) await context.addInitScript(sizeInit, opts.captionPx);
+  // credentials / personal data blurred before the first frame (opts.redact: false to turn off)
+  const redact = redactConfig(opts.redact ?? {});
+  if (redact) await context.addInitScript(redactInit, redact);
   const page = await context.newPage();
   const t0 = Date.now();
   const marks = [];
@@ -253,10 +259,13 @@ async function startElectron(pw, opts, view, font) {
   const app = await pw._electron.launch({ ...opts.electron, recordVideo: { dir: rawDir, size: view } });
   await app.context().addInitScript(overlayInit, font);
   if (opts.captionPx) await app.context().addInitScript(sizeInit, opts.captionPx);
+  const redact = redactConfig(opts.redact ?? {});
+  if (redact) await app.context().addInitScript(redactInit, redact);
   const page = await app.firstWindow();
   await page.waitForLoadState("domcontentloaded");
   await page.evaluate(overlayInit, font); // the first window loaded before the init script existed
   if (opts.captionPx) await page.evaluate(sizeInit, opts.captionPx);
+  if (redact) await page.evaluate(redactInit, redact);
   const t0 = Date.now();
   const marks = [];
   const shots = [];

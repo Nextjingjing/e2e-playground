@@ -22,6 +22,14 @@ synthesized music bed (no copyright). Full 1-minute video: *YouTube link coming 
 | `human-yardstick` (ไม้บรรทัดมนุษย์) | Reference numbers about people, each with its source and how solid it is: reading speed (Thai/English), how long text or a highlight must stay on screen, response-time limits, working memory (~4 chunks), contrast, target sizes, colour blindness, video length, writing/speaking in keywords — plus ready formulas. The other skills take their timing and size defaults from it. |
 | `brat-e2e` (เด็กดื้อกดทุกปุ่ม) | Writes automated end-to-end tests that don't flake, following Playwright's official best practices (user-facing locators, web-first assertions, isolated tests, stubbed network and data, controlled clock) — Playwright, bats-core, pywinauto or Maestro depending on the app. Stands on its own; it doesn't produce guides or videos. |
 
+**No credential leaks.** Everything that captures the screen (`show-and-tell`, `paparazzi`,
+`hold-my-hand`) covers credentials and personal data with solid bars *before* a frame is
+painted — emails, tokens and API keys, password fields, `password=…` text, credentials in
+URLs, ID/phone/card numbers, long ids, plus any names you list. Logins are read from
+environment variables and filmed off camera; `brat-e2e` keeps secrets out of specs, HAR files
+and CI artifacts; and this repo has GitHub secret scanning with push protection, so a
+commit containing a credential is refused.
+
 The guide, screenshot and test skills keep away from real databases: data comes from
 stubbed API responses, and the clock is fixed so times in pictures and tests are stable.
 `show-and-tell` is the exception on purpose — it exists to prove the feature works on the real

@@ -22,6 +22,10 @@ the viewer will see. Point to any design notes worth reading first.>
 5. Exactly <one> item per case.
 6. Title card first (text in your case block); captions on every step.
 7. Story: <generic story every case follows, ending with the proof on screen>.
+8. Nothing secret on screen or in files. Keep the kit's redaction on and pass
+   `redact: { text: [<display name>, <username>, <employee id>, ...] }`. Read credentials
+   from `<env vars / file path>`; never print them, never write them into scripts, STATUS.md,
+   review notes or your report. Any readable credential or personal data in a frame = retake.
 
 ## Do NOT
 - Edit the product repo or run git commands that change state. Found a bug? Stop and

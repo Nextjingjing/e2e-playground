@@ -5,17 +5,26 @@
 import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const { chromium } = require("playwright");
+const { redactInit, redactConfig } = require("./redact.cjs"); // copy redact.cjs next to this script
 
 const baseUrl = "http://localhost:3000"; // TODO: this project's dev server
 const assets = "docs/assets"; // TODO: where images should land, relative to cwd
 
+// Credentials come from the environment, never from this file (it gets committed).
+const { DEMO_USER, DEMO_PASS } = process.env;
+
 const browser = await chromium.launch({ headless: true });
-const page = await browser.newPage({ viewport: { width: 1600, height: 1000 }, deviceScaleFactor: 1 });
+const context = await browser.newContext({ viewport: { width: 1600, height: 1000 }, deviceScaleFactor: 1 });
+// Cover credentials and personal data before anything is painted. Add names/ids you know will show:
+// redactConfig({ text: [DEMO_USER, "Real Name"] }). Turn off only for data you know is fake.
+await context.addInitScript(redactInit, redactConfig({ text: [DEMO_USER] }));
+const page = await context.newPage();
 
 // --- Log in as a seeded/demo account. Wait for a real "loaded" signal,
 // never a fixed sleep. ---
 await page.goto(`${baseUrl}/login`, { waitUntil: "networkidle" });
-// await page.getByLabel("...").fill("...");
+// await page.getByLabel("...").fill(DEMO_USER);
+// await page.getByLabel("...").fill(DEMO_PASS);
 // await page.getByRole("button", { name: "..." }).click();
 // await page.waitForURL(`${baseUrl}/`, { waitUntil: "domcontentloaded" });
 // await page.getByRole("heading", { name: "..." }).waitFor();
