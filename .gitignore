@@ -9,3 +9,4 @@ node_modules/
 _raw/
 _auth-state.json
 .DS_Store
+dist/

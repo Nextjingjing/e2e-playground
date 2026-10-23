@@ -58,7 +58,7 @@ which sibling to use instead, so they don't fight over a request:
 | an automated test that keeps it working | `brat-e2e` |
 | "how long should this stay on screen / how big / how short" | `human-yardstick` |
 
-Cost: only the four descriptions (~1.3k tokens) sit in every session; a skill's body
+Cost: only the five descriptions (~1.7k tokens) sit in every session; a skill's body
 (~3k tokens) loads only when that skill fires (`claude plugin details e2e-playground@e2e-playground`).
 Keeping them separate is cheaper than one big skill, which would load everything each time.
 
@@ -68,24 +68,19 @@ Each skill is a plain [Agent Skills](https://agentskills.io) folder (`SKILL.md` 
 the open format read by Claude Code, OpenAI Codex, Gemini CLI, GitHub Copilot, Cursor and
 others. The scripts are ordinary Node.js / Python / ffmpeg, so nothing depends on one vendor.
 
-```powershell
-git clone https://github.com/Nextjingjing/e2e-playground
-cd e2e-playground
-.\install.ps1                 # Windows: links the skills into every tool found (Codex, Gemini CLI, ~/.agents)
-./install.sh                  # macOS / Linux
-.\install.ps1 -Tools codex    # just one tool;  -Dest <folder> for any other tool's skills folder
-```
+**→ Step-by-step install for every tool: [docs/INSTALL.md](docs/INSTALL.md) · [ภาษาไทย](docs/INSTALL.th.md)**
 
-Links (junctions / symlinks) mean `git pull` updates every tool at once; add `-Copy` /
-`COPY=1` to copy instead. Tools that don't load skills by themselves can still use them
-through [`AGENTS.md`](AGENTS.md), which maps each kind of request to the `SKILL.md` to read.
-
-| tool | where the skills go |
+| tool | how |
 |---|---|
-| Claude Code | the plugin below (preferred) or `~/.claude/skills` |
-| OpenAI Codex | `~/.codex/skills` |
-| Gemini CLI | `~/.gemini/skills` (or `~/.agents/skills`) |
-| anything else | its skills folder via `-Dest`, or point it at `AGENTS.md` |
+| Claude Code | `/plugin marketplace add Nextjingjing/e2e-playground` then `/plugin install e2e-playground@e2e-playground` |
+| claude.ai / Claude Desktop | upload the skill zips from [Releases](https://github.com/Nextjingjing/e2e-playground/releases/latest) |
+| OpenAI Codex | `install.ps1 -Tools codex` → `~/.codex/skills` |
+| Gemini CLI, GitHub Copilot (VS Code), Cursor | `install.ps1 -Tools agents` → `~/.agents/skills` (all three read it) |
+| anything else | `install.ps1 -Dest <its skills folder>`, or point it at [`AGENTS.md`](AGENTS.md) |
+
+On Windows run the script as `powershell -ExecutionPolicy Bypass -File .\install.ps1 …`;
+on macOS / Linux use `./install.sh …`. It links rather than copies, so `git pull` updates
+every tool at once.
 
 Each `description` stays under the spec's 1,024-character limit; some tools skip a skill
 that goes over.

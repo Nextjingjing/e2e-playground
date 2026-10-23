@@ -1,49 +1,85 @@
-# Install the e2e-playground skills for any AI coding tool that reads SKILL.md folders.
+# Install the e2e-playground skills for AI coding tools that read SKILL.md folders.
+# Step-by-step guide: docs/INSTALL.md (English) / docs/INSTALL.th.md (ไทย)
 #
-#   .\install.ps1                      # every tool found on this machine
-#   .\install.ps1 -Tools codex,gemini  # only these
-#   .\install.ps1 -Dest D:\my\skills   # any other tool: its skills folder
-#   .\install.ps1 -Copy                # copy instead of link (links follow `git pull`)
+#   .\install.ps1                         # default: ~/.agents/skills + ~/.codex/skills
+#   .\install.ps1 -Tools cursor,copilot   # pick tools (agents codex gemini copilot cursor claude)
+#   .\install.ps1 -Dest D:\my\skills      # any other tool: its skills folder
+#   .\install.ps1 -Copy                   # copy instead of link (links follow `git pull`)
+#   .\install.ps1 -Zip                    # make dist\<skill>.zip for claude.ai / Claude Desktop upload
+#   .\install.ps1 -Remove                 # take the links/copies out again
 #
-# Claude Code is better served by the plugin (one source, no duplicates):
+# Claude Code: use the plugin instead (one source, no duplicates):
 #   /plugin marketplace add Nextjingjing/e2e-playground
 #   /plugin install e2e-playground@e2e-playground
 param(
-  [string[]]$Tools = @(),
+  [string[]]$Tools = @("agents", "codex"),
   [string]$Dest,
-  [switch]$Copy
+  [switch]$Copy,
+  [switch]$Zip,
+  [switch]$Remove
 )
 $ErrorActionPreference = "Stop"
 $src = Join-Path $PSScriptRoot "plugins\e2e-playground\skills"
-$homeDir = $env:USERPROFILE
+$h = $env:USERPROFILE
+# One folder per tool. ~/.agents/skills is read by Gemini CLI, VS Code Copilot and Cursor, so
+# installing there AND into their own folder makes every skill show up twice.
 $targets = [ordered]@{
-  codex  = Join-Path $homeDir ".codex\skills"    # OpenAI Codex CLI / IDE / app
-  gemini = Join-Path $homeDir ".gemini\skills"   # Gemini CLI
-  agents = Join-Path $homeDir ".agents\skills"   # shared location several tools scan
-  claude = Join-Path $homeDir ".claude\skills"   # only if you don't use the plugin
+  agents  = Join-Path $h ".agents\skills"    # shared: Gemini CLI, VS Code Copilot, Cursor
+  codex   = Join-Path $h ".codex\skills"     # OpenAI Codex CLI / IDE / app
+  gemini  = Join-Path $h ".gemini\skills"    # only if you skip "agents"
+  copilot = Join-Path $h ".copilot\skills"   # only if you skip "agents"
+  cursor  = Join-Path $h ".cursor\skills"    # only if you skip "agents"
+  claude  = Join-Path $h ".claude\skills"    # only if you don't use the Claude Code plugin
+}
+$skills = Get-ChildItem $src -Directory
+
+if ($Zip) {
+  $out = Join-Path $PSScriptRoot "dist"
+  New-Item -ItemType Directory -Force $out | Out-Null
+  Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
+  foreach ($s in $skills) {
+    $z = Join-Path $out "$($s.Name).zip"
+    if (Test-Path $z) { Remove-Item $z }
+    # Compress-Archive in PowerShell 5.1 writes "a\b" entry names; other systems need "a/b"
+    $archive = [System.IO.Compression.ZipFile]::Open($z, "Create")
+    foreach ($f in Get-ChildItem $s.FullName -Recurse -File | Where-Object { $_.FullName -notmatch "__pycache__" }) {
+      $entry = $s.Name + "/" + $f.FullName.Substring($s.FullName.Length + 1).Replace("\", "/")
+      [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive, $f.FullName, $entry) | Out-Null
+    }
+    $archive.Dispose()
+    Write-Host "  zip $z"
+  }
+  Write-Host "Upload each zip in claude.ai: Customize > Skills > + (or Settings > Capabilities > Upload skill)."
+  return
 }
 
-function Install-Into($dir) {
-  New-Item -ItemType Directory -Force $dir | Out-Null
-  foreach ($skill in Get-ChildItem $src -Directory) {
-    $to = Join-Path $dir $skill.Name
-    if (Test-Path $to) { Write-Host "  skip $($skill.Name) (already in $dir)"; continue }
-    if ($Copy) { Copy-Item $skill.FullName $to -Recurse }
-    else { New-Item -ItemType Junction -Path $to -Target $skill.FullName | Out-Null }  # no admin needed
-    Write-Host "  + $($skill.Name) -> $to"
+function Apply($dir) {
+  foreach ($s in $skills) {
+    $to = Join-Path $dir $s.Name
+    if ($Remove) {
+      if (Test-Path $to) {
+        $item = Get-Item $to -Force
+        # a junction: drop the link only (Remove-Item -Recurse on a junction can empty the source in PS 5.1)
+        if ($item.LinkType) { [System.IO.Directory]::Delete($to, $false) }
+        else { Remove-Item $to -Recurse -Force }
+        Write-Host "  - $($s.Name)"
+      }
+      continue
+    }
+    New-Item -ItemType Directory -Force $dir | Out-Null
+    if (Test-Path $to) { Write-Host "  = $($s.Name) already there"; continue }
+    if ($Copy) { Copy-Item $s.FullName $to -Recurse }
+    else { New-Item -ItemType Junction -Path $to -Target $s.FullName | Out-Null }  # no admin needed
+    Write-Host "  + $($s.Name)"
   }
 }
 
-if ($Dest) { Install-Into $Dest; return }
-if ($Tools.Count -eq 0) {
-  # default: tools that are installed here (claude is left to the plugin)
-  if (Get-Command codex -ErrorAction SilentlyContinue)  { $Tools += "codex" }
-  if (Get-Command gemini -ErrorAction SilentlyContinue) { $Tools += "gemini" }
-  $Tools += "agents"
+if ($Dest) { Write-Host $Dest; Apply $Dest }
+else {
+  foreach ($t in $Tools) {
+    if (-not $targets.Contains($t)) { throw "unknown tool '$t' - use: $($targets.Keys -join ', ') or -Dest <folder>" }
+    Write-Host "$t -> $($targets[$t])"
+    Apply $targets[$t]
+  }
 }
-foreach ($t in $Tools) {
-  if (-not $targets.Contains($t)) { throw "unknown tool '$t' (use: $($targets.Keys -join ', ') or -Dest <folder>)" }
-  Write-Host "$t -> $($targets[$t])"
-  Install-Into $targets[$t]
-}
-Write-Host "Done. Restart the tool so it picks the skills up."
+Write-Host "Done. Restart the AI tool (or open a new chat) so it loads the skills."
