@@ -162,9 +162,22 @@ function overlayInit(font) {
   }, true);
 }
 
+// Bigger captions/labels for videos watched on phones (human-yardstick: >= 32 px at 1280x720).
+function sizeInit(px) {
+  const add = () => {
+    if (document.getElementById("__demo_size")) return;
+    const s = document.createElement("style");
+    s.id = "__demo_size";
+    s.textContent = `#__demo_caption{font-size:${px}px !important}.__demo_hl_label{font-size:${Math.round(px * 0.85)}px !important}`;
+    (document.head || document.documentElement).appendChild(s);
+  };
+  document.addEventListener("DOMContentLoaded", add);
+  setInterval(add, 500);
+}
+
 // ---------- session ----------
 // opts: baseURL, outDir, name, startUrl, login(page) [run once, not recorded],
-//       storageStatePath, view, font, projectDir, contextOptions, origin permissions
+//       storageStatePath, view, font, captionPx, projectDir, contextOptions, origin permissions
 async function startSession(opts) {
   const { baseURL, outDir, name, startUrl, login } = opts;
   const view = opts.view || DEFAULT_VIEW;
@@ -198,6 +211,7 @@ async function startSession(opts) {
     ...(opts.contextOptions || {}),
   });
   await context.addInitScript(overlayInit, font);
+  if (opts.captionPx) await context.addInitScript(sizeInit, opts.captionPx);
   const page = await context.newPage();
   const t0 = Date.now();
   const marks = [];
@@ -238,9 +252,11 @@ async function startElectron(pw, opts, view, font) {
   const rawDir = path.join(outDir, "_raw", name);
   const app = await pw._electron.launch({ ...opts.electron, recordVideo: { dir: rawDir, size: view } });
   await app.context().addInitScript(overlayInit, font);
+  if (opts.captionPx) await app.context().addInitScript(sizeInit, opts.captionPx);
   const page = await app.firstWindow();
   await page.waitForLoadState("domcontentloaded");
   await page.evaluate(overlayInit, font); // the first window loaded before the init script existed
+  if (opts.captionPx) await page.evaluate(sizeInit, opts.captionPx);
   const t0 = Date.now();
   const marks = [];
   const shots = [];

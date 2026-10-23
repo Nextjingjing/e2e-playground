@@ -1,7 +1,18 @@
 # e2e-playground
 
-Claude Code skills for **guides anyone can follow**, **screenshots**, **demo videos** and
-**tests that don't flake** — four kids in one end-to-end playground:
+Claude Code skills for **guides anyone can follow**, **screenshots**, **demo videos**,
+**tests that don't flake** and **numbers about people** — five kids in one end-to-end
+playground.
+
+## Demo
+
+![show-and-tell touring nextjingjing.github.io: search, open a post, dark mode, archives](docs/demo.gif)
+
+Recorded by `show-and-tell` from one prompt: a real browser on the live site, real mouse and
+keyboard, highlights, captions, a title card, fast-forwarded waiting and an original
+synthesized music bed (no copyright). Full 1-minute video: *YouTube link coming soon*.
+
+## Skills
 
 | skill | what it does |
 |---|---|
@@ -48,7 +59,7 @@ which sibling to use instead, so they don't fight over a request:
 | "how long should this stay on screen / how big / how short" | `human-yardstick` |
 
 Cost: only the four descriptions (~1.3k tokens) sit in every session; a skill's body
-(~3k tokens) loads only when that skill fires (`claude plugin details e2e-playground@followable-guide`).
+(~3k tokens) loads only when that skill fires (`claude plugin details e2e-playground@e2e-playground`).
 Keeping them separate is cheaper than one big skill, which would load everything each time.
 
 ## Install
@@ -56,15 +67,15 @@ Keeping them separate is cheaper than one big skill, which would load everything
 In Claude Code:
 
 ```
-/plugin marketplace add nextjingjing/followable-guide
-/plugin install e2e-playground@followable-guide
+/plugin marketplace add Nextjingjing/e2e-playground
+/plugin install e2e-playground@e2e-playground
 ```
 
 From a local clone instead:
 
 ```
 claude plugin marketplace add <path-to-clone>
-claude plugin install e2e-playground@followable-guide
+claude plugin install e2e-playground@e2e-playground
 ```
 
 A local install reads the skills straight from the clone: edits take effect at the next
