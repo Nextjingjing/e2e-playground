@@ -6,11 +6,11 @@ playground.
 
 ## Demo
 
-![show-and-tell touring nextjingjing.github.io: search, open a post, dark mode, archives](docs/demo.gif)
+[![show-and-tell teaching sqlbolt.com: read a lesson, type a query, get every task ticked, continue](https://img.youtube.com/vi/hNvjIyoIa-8/hqdefault.jpg)](https://youtu.be/hNvjIyoIa-8)
 
-Recorded by `show-and-tell` from one prompt: a real browser on the live site, real mouse and
-keyboard, highlights, captions, a title card, fast-forwarded waiting and an original
-synthesized music bed (no copyright).
+A SQLBolt tutorial recorded by `show-and-tell` from one prompt ("ทำคลิปสอนใช้ sqlbolt"): a real
+browser on the live site, real mouse and keyboard, highlights, Thai captions, title and summary
+cards, fast-forwarded waiting and an original synthesized music bed (no copyright).
 
 ### Made by another AI (Qwen) with these skills
 
