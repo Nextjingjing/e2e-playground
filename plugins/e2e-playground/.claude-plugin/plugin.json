@@ -1,0 +1,20 @@
+{
+  "name": "e2e-playground",
+  "version": "0.3.1",
+  "description": "hold-my-hand (click-by-click guides anyone can follow), paparazzi (real annotated screenshots), brat-e2e (E2E tests that don't flake) and show-and-tell (demo videos recorded on the real app with real clicks).",
+  "author": {
+    "name": "nextjingjing"
+  },
+  "license": "MIT",
+  "keywords": [
+    "documentation",
+    "manual",
+    "qa",
+    "testing",
+    "e2e",
+    "screenshots",
+    "playwright",
+    "video",
+    "demo"
+  ]
+}

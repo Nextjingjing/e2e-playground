@@ -1,0 +1,146 @@
+---
+name: brat-e2e
+description: Write reliable automated end-to-end tests with open-source tools by default (Playwright for web and Electron, bats-core for CLIs, pywinauto for Windows desktop, Maestro CLI for mobile, Playwright request / pytest for HTTP APIs), following Playwright's official best practices — user-facing locators, web-first assertions, isolated tests, stubbed network and data, controlled clock — so they don't flake. Use whenever the user asks to test a feature or flow automatically, "write e2e", "add a Playwright test", "test this CLI", "how do we make sure this keeps working", "ทำ e2e", "เขียนเทสต์ให้หน้านี้", or after building a feature that needs an automated check — even if they don't say which test tool to use.
+---
+
+# E2E tests that don't flake
+
+## 1. Is E2E the right level?
+
+End-to-end tests give the most confidence but are slow, flaky-prone and costly to maintain,
+so a suite should keep only a few of them, aimed at high-value user journeys (the flow that
+has broken before, the one money or stock depends on), and push detailed edge cases down to
+unit/integration tests (Fowler, *The Practical Test Pyramid*). If most of what the user wants
+checked is logic with no UI, say so in one line and suggest the unit/integration test next to
+it; write the E2E test for the journey itself.
+
+## 2. Pick the tool — open source by default
+
+Use the open-source default for the surface unless the user or the project already uses
+something else:
+
+| surface | default |
+|---|---|
+| Web app, Electron | Playwright Test (Apache-2.0) |
+| Terminal / CLI | bats-core (MIT), or pytest + subprocess in Python projects |
+| Windows desktop (native) | pytest + pywinauto `uia` backend (BSD-3) |
+| Mobile | Maestro CLI flows (Apache-2.0); not Maestro Cloud (paid) |
+| HTTP API | Playwright `request` fixture or pytest + requests |
+
+Examples for each are in `references/surfaces.md`. The rules in section 4
+were written for Playwright but carry over: find things the way a user would (visible text,
+control titles), wait for conditions instead of sleeping, isolate each test, fake the data and
+the clock, and never touch a real database. The rest of this file uses web examples.
+
+## 3. Learn the project before writing
+
+- Find the existing E2E setup: `playwright.config.*`, test folder, naming (e.g.
+  `*.mocked.spec.js` vs `*.live.spec.js`), how other specs fake login. Copy their patterns.
+- If there is no Playwright yet, propose `npm init playwright@latest` (or adding
+  `@playwright/test`) and wait for a yes before changing dependencies.
+- Find how the feature really works in code: which API calls it makes and what fields the UI
+  reads. Tests stub exactly those.
+
+## 4. Rules for tests that don't flake
+
+Each rule follows Playwright's official guidance (links in *Sources*).
+
+**Test what the user sees.** Assert on rendered text, roles and visible state, not on
+function names, internal arrays or CSS classes. A class check is acceptable only when the
+class *is* the requirement (e.g. "the text must be red") — say so in a comment.
+
+**Locate like a user.** Prefer, in order: `getByRole` → `getByText` → `getByLabel` →
+`getByPlaceholder` → `getByAltText` → `getByTitle` → `getByTestId`. Avoid CSS/XPath; the DOM
+changes. Narrow with chaining and `.filter({ hasText })`, e.g. find the row first, then the
+button inside it. `npx playwright codegen <url>` suggests resilient locators.
+
+**Use web-first assertions.** `await expect(locator).toBeVisible()` / `toHaveText()` retry
+until the timeout. Never `expect(await locator.isVisible()).toBe(true)` — it checks once and
+races the page. No fixed `waitForTimeout` sleeps.
+
+**Keep every test isolated.** Each test sets up its own data and state (`beforeEach`, or a
+setup function per test), so tests pass alone, in any order, and in parallel.
+
+**Control data and the network.** Don't depend on systems you don't own, and never on a real
+or shared database. Stub with `page.route()` + `route.fulfill({ json })`; register a catch-all
+first and specific routes after (later routes win). For realistic payloads, record once with
+`routeFromHAR(..., { update: true })` and replay. Record every non-GET request in the stub
+and assert on it — that proves what the UI *sent*, and that nothing else was written.
+
+**Control time.** If the screen shows times or counts down:
+- only need a fixed "now" → `page.clock.setFixedTime(...)` (Playwright's recommended first
+  choice);
+- need timers to run → `page.clock.install({ time })`, then `fastForward("30:00")` to jump
+  (due timers fire once) or `runFor(...)` for step-by-step ticking (fires every timer — slow
+  over long spans);
+- set `timezoneId` in `test.use` so dates render the same on every machine and CI.
+
+**Assert there are no page errors.** Collect `page.on("pageerror")` and expect it empty at
+the end.
+
+**No screenshots as assertions** unless the user asks for visual regression; they're brittle
+across OS/browser versions. Keep traces for debugging instead.
+
+## 5. Shape of a test file
+
+```js
+// What the feature does, in one or two lines. Every API call is stubbed — no real database.
+const { test, expect } = require("@playwright/test");
+
+test.use({ timezoneId: "UTC" });
+
+async function setup(page, rows) {
+  const writes = [];
+  await page.clock.install({ time: new Date("2026-01-15T10:00:00Z") });
+  await page.route("**/api/**", (route) => {
+    if (route.request().method() !== "GET") writes.push(route.request().url());
+    return route.fulfill({ json: { success: true, data: [] } });
+  });
+  await page.route("**/api/orders?**", (route) => route.fulfill({ json: { success: true, data: rows } }));
+  return writes;
+}
+
+test("shows how long an order has waited and keeps counting", async ({ page }) => {
+  const errors = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  const writes = await setup(page, [{ id: 1, code: "A-001", picked_at: "2026-01-15T09:20:00Z" }]);
+  await page.goto("/orders");
+
+  const row = page.getByRole("row", { name: /A-001/ });
+  await expect(row.getByText(/^Waiting /)).toHaveText("Waiting 40 min");
+
+  await page.clock.fastForward("30:00");
+  await expect(row.getByText(/^Waiting /)).toHaveText("Waiting 1 h 10 min");
+
+  expect(writes).toEqual([]);
+  expect(errors).toEqual([]);
+});
+```
+
+Name tests by behaviour ("hides the wait once loading starts"), one behaviour per test, and
+cover the negative cases (when the thing must *not* show) alongside the happy path.
+
+## 6. Run, then report honestly
+
+- Run only the new spec first: `npx playwright test path/to/spec --reporter=list`.
+- If something fails, open the trace (`npx playwright show-trace ...`) before changing the
+  test. Fix the test only when the test is wrong; if the app is wrong, report it.
+- Report pass/fail counts and run time. If a long `runFor` makes a test slow, switch to
+  `fastForward`.
+- For CI: `npx playwright install chromium --with-deps`, `trace: "on-first-retry"`, run on
+  every PR. Lint with `@typescript-eslint/no-floating-promises` to catch missing `await`.
+
+## Sources
+
+- Playwright — Best Practices: https://playwright.dev/docs/best-practices
+- Playwright — Locators (priority order): https://playwright.dev/docs/locators
+- Playwright — Mock APIs (`route`, `fulfill`, HAR): https://playwright.dev/docs/mock
+- Playwright — Clock: https://playwright.dev/docs/clock
+- Testing Library — Guiding Principles ("The more your tests resemble the way your software
+  is used, the more confidence they can give you."): https://testing-library.com/docs/guiding-principles
+- Martin Fowler / Ham Vocke — The Practical Test Pyramid:
+  https://martinfowler.com/articles/practical-test-pyramid.html
+- bats-core — Writing tests (`run`, `$status`, `$output`): https://bats-core.readthedocs.io/en/stable/writing-tests.html
+- pywinauto — Getting started (UIA backend): https://pywinauto.readthedocs.io/en/latest/getting_started.html
+- Maestro (Apache-2.0 CLI): https://github.com/mobile-dev-inc/maestro
+- Playwright — Electron (experimental): https://playwright.dev/docs/api/class-electron

@@ -1,0 +1,158 @@
+<title>{{Guide name, 2-4 words}}</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column; each step = where + what to press + what you should see + the real screen */
+:root {
+  --bg: #f6f5f1;
+  --surface: #ffffff;
+  --fg: #1f2328;
+  --muted: #5d636b;
+  --line: #e2dfd6;
+  --accent: #b45309;
+  --accent-soft: #fdf3e2;
+  --wait: #dc2626;
+  --wait-soft: #fdecec;
+  --real: #1d4ed8;
+  --real-soft: #e8efff;
+  --code-bg: #efece4;
+  --font-display: "Sarabun", "Leelawadee UI", "Tahoma", system-ui, sans-serif;
+  --font-body: "Sarabun", "Leelawadee UI", "Tahoma", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "Consolas", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #17181a; --surface: #202225; --fg: #e9e7e2; --muted: #a3a7ad; --line: #34373b;
+    --accent: #f0a646; --accent-soft: #2e2416; --wait: #f87171; --wait-soft: #3a1c1c;
+    --real: #93b4ff; --real-soft: #1b2440; --code-bg: #2a2c30; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #17181a; --surface: #202225; --fg: #e9e7e2; --muted: #a3a7ad; --line: #34373b;
+  --accent: #f0a646; --accent-soft: #2e2416; --wait: #f87171; --wait-soft: #3a1c1c;
+  --real: #93b4ff; --real-soft: #1b2440; --code-bg: #2a2c30; color-scheme: dark;
+}
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 16px; line-height: 1.7; }
+.wrap {
+  max-width: 1000px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 40px 64px;
+  display: grid; gap: 40px;
+}
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; line-height: 1.3; margin: 0; }
+h1 { font-size: clamp(1.7rem, 4vw, 2.3rem); font-weight: 700; }
+h2 { font-size: 1.35rem; font-weight: 700; }
+h3 { font-size: 1.08rem; font-weight: 600; }
+p { margin: 0; }
+header { display: grid; gap: 10px; }
+.lede { color: var(--muted); max-width: 68ch; }
+.eyebrow { font-size: .8rem; letter-spacing: .06em; color: var(--accent); font-weight: 600; }
+code { font-family: var(--font-mono); font-size: .88em; background: var(--code-bg); padding: 1px 6px; border-radius: 4px; }
+.wait { color: var(--wait); font-weight: 600; }
+.n { display: inline-flex; align-items: center; justify-content: center; width: 1.45em; height: 1.45em; border-radius: 50%; background: #b45309; color: #fff; font: 700 .8em/1 system-ui, sans-serif; vertical-align: .1em; }
+section { display: grid; gap: 14px; }
+.note { color: var(--muted); font-size: .93rem; max-width: 72ch; }
+
+.rule { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.rule div { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; display: grid; gap: 4px; }
+.rule b { font-family: var(--font-display); font-weight: 600; }
+.rule span { color: var(--muted); font-size: .92rem; }
+
+ol.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 18px; counter-reset: s; }
+ol.steps > li {
+  counter-increment: s; background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  padding: 18px 20px; display: grid; gap: 12px; min-width: 0;
+}
+.head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.head::before { content: "Step " counter(s); font-family: var(--font-display); font-weight: 700; color: var(--accent); font-size: .95rem; font-variant-numeric: tabular-nums; }
+.where { font-size: .78rem; font-weight: 600; letter-spacing: .03em; color: var(--real); background: var(--real-soft); border-radius: 999px; padding: 1px 10px; }
+.where.dev { color: var(--accent); background: var(--accent-soft); }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.pair > div { display: grid; gap: 4px; align-content: start; min-width: 0; }
+.label { font-size: .76rem; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+.see { background: var(--wait-soft); border-radius: 6px; padding: 8px 12px; }
+.see.plain { background: var(--code-bg); }
+.shortcut { font-size: .9rem; color: var(--muted); border-top: 1px dashed var(--line); padding-top: 8px; }
+.shortcut b { color: var(--accent); }
+
+figure { margin: 0; display: grid; gap: 6px; min-width: 0; }
+.shot { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.shot img { display: block; max-width: none; height: auto; }
+.shot.fit img { max-width: 100%; }
+figcaption { font-size: .86rem; color: var(--muted); }
+/* result picture: the "after" state of a step, same crop as the action picture */
+figure.result .shot { border: 2px solid var(--real); }
+figure.result figcaption { color: var(--real); font-weight: 500; }
+figure.result figcaption::before { content: "You should see · "; font-weight: 600; }
+
+.tablewrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: .94rem; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-family: var(--font-display); font-weight: 600; }
+pre { margin: 0; background: var(--code-bg); border-radius: 8px; padding: 14px 16px; overflow-x: auto; font-family: var(--font-mono); font-size: .84rem; line-height: 1.6; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 640px) { .pair { grid-template-columns: 1fr; } ol.steps > li { padding: 14px; } }
+</style>
+
+<div class="wrap">
+  <!-- Followable guide template. Replace every {{...}}. Labels in <b> must match the screen exactly. -->
+  <header>
+    <div class="eyebrow">{{PAGE / FEATURE}}</div>
+    <h1>{{Guide name}}</h1>
+    <p class="lede">{{What is being tested, through which pages, and what the dev tools stand in for (if any).}}</p>
+    <p class="note">Pictures are from the real app with simulated data (no real database) and the clock fixed at {{time}}. Orange outlines and numbers like <span class="n">1</span> are guide marks, not part of the UI.</p>
+  </header>
+
+  <section>
+    <h2>What is being tested</h2>
+    <div class="rule">
+      <div><b>{{Rule}}</b><span>{{One-line explanation}}</span></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Steps</h2>
+    <p class="note">{{Log in as which role, which servers must run, starting URL.}}</p>
+    <ol class="steps">
+      <li>
+        <div class="head"><h3>{{Goal of this step}}</h3><span class="where">{{Page}}</span></div>
+        <div class="pair">
+          <div><span class="label">DO</span><p><span class="n">1</span> {{action}} <span class="n">2</span> click <b>{{exact button label}}</b></p></div>
+          <div><span class="label">YOU SHOULD SEE</span><p class="see plain">{{Something visible on screen that proves it worked}}</p></div>
+        </div>
+        <figure>
+          <div class="shot"><img src="img/{{file}}.png" alt="{{describe the picture}}" width="{{w}}" height="{{h}}"></div>
+          <figcaption>{{Explain numbers in the picture if needed}}</figcaption>
+        </figure>
+        <!-- result picture: add when the change is visual; outline the changed spot, no number -->
+        <figure class="result">
+          <div class="shot"><img src="img/{{file}}-after.png" alt="{{picture after the action}}" width="{{w}}" height="{{h}}"></div>
+          <figcaption>{{the visible result}}</figcaption>
+        </figure>
+        <p class="shortcut"><b>Dev shortcut:</b> {{button that replaces this step}}</p>
+      </li>
+      <!-- The last step is always cleanup. -->
+    </ol>
+  </section>
+
+  <section>
+    <h2>Shortcuts</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Control</th><th>What it does</th><th>Replaces</th></tr></thead>
+        <tbody><tr><td><span class="n">1</span> {{control}}</td><td>{{effect}}</td><td>Step {{n}}</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>If the result doesn't match</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Symptom</th><th>Check</th></tr></thead>
+        <tbody><tr><td>{{symptom}}</td><td>{{where to look, e.g. DevTools → Network → which field}}</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+</div>

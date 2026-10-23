@@ -1,0 +1,16 @@
+{
+  "name": "followable-guide",
+  "owner": {
+    "name": "nextjingjing"
+  },
+  "metadata": {
+    "description": "Skills for guides people can follow alone, real annotated screenshots, reliable E2E tests and demo videos of the real app."
+  },
+  "plugins": [
+    {
+      "name": "e2e-playground",
+      "source": "./plugins/e2e-playground",
+      "description": "hold-my-hand (click-by-click guides), paparazzi (annotated screenshots), brat-e2e (E2E tests that don't flake) and show-and-tell (demo videos on the real app with real clicks)."
+    }
+  ]
+}
