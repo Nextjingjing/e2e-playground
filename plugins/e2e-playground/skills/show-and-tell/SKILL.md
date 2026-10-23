@@ -1,6 +1,6 @@
 ---
 name: show-and-tell
-description: Record a narrated-looking demo video (mp4 with music) that proves a feature really works, by driving the REAL running app with Playwright exactly like a person: a visible cursor that moves and clicks, real keyboard typing or scanner input, orange highlights on what matters, Thai/English captions on every step, a short title card before each case, slow at the important moments and fast-forwarded through spinners and loading, one video per case plus one combined video. Cases can be recorded in parallel by one subagent each. Use whenever the user asks for a video, screen recording, demo clip, "อัดวิดีโอ", "ทำวิดีโอให้ดู", "ใช้ playwright ทำวิดีโอ", a walkthrough to show the team/boss that something works, proof a bug fix works on the real system, or "show it working end to end" — even if they don't say "video" explicitly but want something to watch rather than read. The same run can also save annotated screenshots of each key moment. Strongest on web apps; also Electron, terminal/CLI, Windows desktop and mobile apps. For a written click-by-click guide use hold-my-hand, for screenshots/Markdown manual only use paparazzi, for an automated test use brat-e2e.
+description: Record a demo video (mp4 with music) proving a feature really works, by driving the REAL running app like a person — visible cursor, real mouse/keyboard or scanner input, highlights, captions, a title card per case, slow on the key moments, spinners fast-forwarded — one video per case plus a combined one, optionally with screenshots of each key moment. Use whenever the user asks for a video, screen recording, demo clip, "อัดวิดีโอ", "ทำวิดีโอให้ดู", a walkthrough showing the team that something works, or proof a fix works on the real system — even if they don't say "video" but want something to watch. Strongest on web apps; also Electron, terminal, Windows desktop, mobile. For a written guide use hold-my-hand, screenshots only paparazzi, an automated test brat-e2e.
 ---
 
 # Demo video
@@ -203,7 +203,8 @@ Pictures are the expensive part (a full 1440×900 frame is ~1.7k tokens to look 
 
 ## 7. Many cases: one subagent per case
 
-Cases are independent, so record them in parallel — one subagent each, a mid-tier model
+Cases are independent, so record them in parallel — one subagent each (or, in a tool
+without subagents, one session/terminal per case with the same brief), a mid-tier model
 is enough (the kit does the hard parts). Fill `references/agent-brief.md` once (shared
 rules + kit API) and give each agent only its case: data setup, story, card text, file
 name, music seed, unique identifiers.
