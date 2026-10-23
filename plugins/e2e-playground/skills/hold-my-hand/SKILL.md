@@ -108,8 +108,10 @@ would cover text), `clearMarks`, `around(page, locators, pad)` for a tight clip,
   the password itself.
 
 **Open every PNG before publishing.** A selector that matches the wrong element still
-"succeeds". Check the badge sits on the right element, nothing important is clipped, and the
-numbers match the text. Look at each picture **once**: write one line per image in
+"succeeds". Check the badge sits on the right element, nothing important is clipped, the
+numbers match the text, and **no badge or outline hides a label the reader must read or
+another badge** (`annotate` already moves a badge off a neighbour; for crowded rows use
+`pos: "left"` or split the step into two pictures). Look at each picture **once**: write one line per image in
 `<guide>/REVIEW.md` (file, what it shows, ok / what is wrong). A later round or session
 re-opens only the images whose capture changed since that line, never the whole set.
 Sizes, text length and contrast for the page: see the human-yardstick skill.

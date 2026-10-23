@@ -135,9 +135,9 @@ function overlayInit(font) {
     cap.id = "__demo_caption";
     root.appendChild(cap);
     (document.body || document.documentElement).appendChild(root);
-    const last = sessionStorage.getItem("__demo_mouse");
+    let last = null; try { last = sessionStorage.getItem("__demo_mouse"); } catch {}
     if (last) { const [x, y] = JSON.parse(last); cur.style.left = x + "px"; cur.style.top = y + "px"; }
-    const c = sessionStorage.getItem("__demo_caption");
+    let c = null; try { c = sessionStorage.getItem("__demo_caption"); } catch {}
     if (c) { const { text, top } = JSON.parse(c); cap.textContent = text || ""; cap.classList.toggle("top", !!top); cap.style.opacity = text ? 1 : 0; }
   };
   document.addEventListener("DOMContentLoaded", install);
@@ -145,7 +145,7 @@ function overlayInit(font) {
   window.addEventListener("mousemove", e => {
     const c = document.getElementById("__demo_cursor");
     if (c) { c.style.left = e.clientX + "px"; c.style.top = e.clientY + "px"; }
-    sessionStorage.setItem("__demo_mouse", JSON.stringify([e.clientX, e.clientY]));
+    try { sessionStorage.setItem("__demo_mouse", JSON.stringify([e.clientX, e.clientY])); } catch {}
   }, true);
   window.addEventListener("mousedown", e => {
     const c = document.getElementById("__demo_cursor");
@@ -391,19 +391,54 @@ function makeDemo(page, marks, t0, { view, font, theme, shots, shotDir }) {
         hl.className = "__demo_hl";
         Object.assign(hl.style, { left: b.x - pad + "px", top: b.y - pad + "px", width: b.width + pad * 2 + "px", height: b.height + pad * 2 + "px" });
         root.appendChild(hl);
+        // Nothing explanatory may cover anything else: the label never sits on the highlighted
+        // element, the caption or another label, and the caption moves out of the way when it
+        // would hide the highlighted element.
+        const target = { x: b.x - pad, y: b.y - pad, w: b.width + pad * 2, h: b.height + pad * 2 };
+        const rectOf = el => { const r = el.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; };
+        const hit = (a, c, gap = 6) => a.x < c.x + c.w + gap && c.x < a.x + a.w + gap && a.y < c.y + c.h + gap && c.y < a.y + a.h + gap;
+        const area = (a, c) => Math.max(0, Math.min(a.x + a.w, c.x + c.w) - Math.max(a.x, c.x)) * Math.max(0, Math.min(a.y + a.h, c.y + c.h) - Math.max(a.y, c.y));
+        const cap = document.getElementById("__demo_caption");
+        let movedCaption = null;
+        if (cap && cap.style.opacity !== "0" && cap.textContent && hit(rectOf(cap), target, 0)) {
+          movedCaption = cap.classList.contains("top");
+          cap.classList.toggle("top", target.y + target.h / 2 > window.innerHeight / 2);
+        }
         let lab;
         if (label) {
           lab = document.createElement("div");
           lab.className = "__demo_hl_label";
+          lab.style.maxWidth = "42vw";
+          lab.style.whiteSpace = "normal";
           lab.textContent = label;
           root.appendChild(lab);
-          const lw = lab.offsetWidth, lh = lab.offsetHeight;
-          let top = b.y - pad - lh - 10;
-          if (top < 70) top = b.y + b.height + pad + 10;
-          const left = Math.min(Math.max(8, b.x + b.width / 2 - lw / 2), window.innerWidth - lw - 8);
-          Object.assign(lab.style, { left: left + "px", top: top + "px" });
+          const lw = lab.offsetWidth, lh = lab.offsetHeight, g = 10, W = window.innerWidth, H = window.innerHeight;
+          const obstacles = [target];
+          if (cap && cap.textContent && cap.style.opacity !== "0") obstacles.push(rectOf(cap));
+          document.querySelectorAll(".__demo_hl_label").forEach(o => { if (o !== lab) obstacles.push(rectOf(o)); });
+          const cx = target.x + target.w / 2 - lw / 2, cy = target.y + target.h / 2 - lh / 2;
+          const candidates = [
+            { x: cx, y: target.y - lh - g },                     // above
+            { x: cx, y: target.y + target.h + g },               // below
+            { x: target.x + target.w + g, y: cy },               // right
+            { x: target.x - lw - g, y: cy },                     // left
+            { x: target.x, y: target.y - lh - g },               // above, left-aligned
+            { x: target.x + target.w - lw, y: target.y + target.h + g }, // below, right-aligned
+            { x: target.x + target.w + g, y: target.y },         // right, top-aligned
+            { x: target.x - lw - g, y: target.y + target.h - lh },  // left, bottom-aligned
+          ].map(c => ({ x: Math.min(Math.max(8, c.x), W - lw - 8), y: Math.min(Math.max(8, c.y), H - lh - 8), w: lw, h: lh }));
+          const free = candidates.find(c => !obstacles.some(o => hit(c, o)));
+          // nowhere fully free: least covered spot, never on the target itself if avoidable
+          const best = free || candidates.slice().sort((a, c) =>
+            obstacles.reduce((s, o, i) => s + area(a, o) * (i === 0 ? 10 : 1), 0) -
+            obstacles.reduce((s, o, i) => s + area(c, o) * (i === 0 ? 10 : 1), 0))[0];
+          Object.assign(lab.style, { left: best.x + "px", top: best.y + "px" });
         }
-        setTimeout(() => { hl.remove(); lab && lab.remove(); }, ms);
+        setTimeout(() => {
+          hl.remove();
+          lab && lab.remove();
+          if (movedCaption !== null && cap) cap.classList.toggle("top", movedCaption);
+        }, ms);
       }, { b, label, ms });
       if (shot) {
         const t = Date.now();
@@ -420,7 +455,7 @@ function makeDemo(page, marks, t0, { view, font, theme, shots, shotDir }) {
       demo.mark("caption: " + text, "caption");
       lastCaption = text || "";
       await page.evaluate(({ text, top }) => {
-        sessionStorage.setItem("__demo_caption", JSON.stringify({ text, top }));
+        try { sessionStorage.setItem("__demo_caption", JSON.stringify({ text, top })); } catch {}
         const c = document.getElementById("__demo_caption");
         if (!c) return;
         c.textContent = text || "";

@@ -143,6 +143,14 @@ await demo.card({ tag: "Case 1", title: "Fill the slot", lines: ["Scan any palle
 await s.finish();
 ```
 
+Nothing explanatory may cover anything else. A label over the button it explains, or a
+caption over the proof, makes the viewer miss exactly the moment you staged. The kit places
+each highlight label at the first free spot around the box (above, below, right, left, …)
+that touches neither the box, the caption nor another label, and moves the caption to the
+other edge while a highlight sits under it. Keep labels short (≤ ~40 characters) so a free
+spot exists; when two things matter at once, highlight both in one `Promise.all` rather than
+stacking text. The review (§6) checks for overlaps too.
+
 Pacing — what makes the video short but still convincing:
 
 - Wrap **every wait for the app** in `demo.waitApp(...)` (page loads, spinners, polling,
@@ -198,8 +206,9 @@ combined video is `recordCard` + `post.py card <card.webm> intro.mp4`.
 Make one contact sheet of the key moments (`post.py sheet`, see below) and look at it:
 title card, the key action, the proof, the end state. Check in the DB (read-only)
 that what the video claims really happened. Retake if a key moment is missing, cut off by
-a popup, or unreadable — or if any credential or personal data is readable in any frame
-(check headers, tables, URL bars, toasts). Then save what you saw so nobody looks again,
+a popup, or unreadable — if a label, caption or card covers the thing it explains or
+another label — or if any credential or personal data is readable in any frame (check
+headers, tables, URL bars, toasts). Then save what you saw so nobody looks again,
 including the redaction check:
 `post.py seen <mp4> --save "0:04 card ok | 0:52 confirm popup ok | 1:31 proof row ok | redaction ok" --by <who>`.
 

@@ -34,6 +34,18 @@ export async function annotate(page, marks) {
     rects.push({ ...b, n: m.n, box: m.box !== false, left: m.pos === "left" });
   }
   await page.evaluate(({ rects, accent }) => {
+    // badges never sit on another badge: try the asked spot, then the other corners/side
+    const placed = [];
+    const clash = (x, y) => placed.some(p => Math.abs(p.x - x) < 36 && Math.abs(p.y - y) < 36); // 28px badge + gap
+    const spot = r => {
+      const cx = r.x + r.width / 2 - 14;
+      const tries = r.left
+        ? [[r.x - 40, r.y + r.height / 2 - 14], [r.x - 16, r.y - 16], [cx, r.y - 38], [cx, r.y + r.height + 8]]
+        : [[r.x - 16, r.y - 16], [cx, r.y - 38], [r.x + r.width - 12, r.y - 16], [cx, r.y + r.height + 8], [r.x - 40, r.y + r.height / 2 - 14]];
+      const free = tries.find(([x, y]) => !clash(x, y)) || tries[0];
+      placed.push({ x: free[0], y: free[1] });
+      return free;
+    };
     for (const r of rects) {
       if (r.box) {
         const o = document.createElement("div");
@@ -45,8 +57,7 @@ export async function annotate(page, marks) {
         const b = document.createElement("div");
         b.dataset.annot = "1";
         b.textContent = String(r.n);
-        const x = r.left ? r.x - 40 : r.x - 16;
-        const y = r.left ? r.y + r.height / 2 - 14 : r.y - 16;
+        const [x, y] = spot(r);
         b.style.cssText = `position:fixed;left:${x}px;top:${y}px;width:28px;height:28px;border-radius:50%;background:${accent};color:#fff;display:flex;align-items:center;justify-content:center;font:700 15px system-ui;box-shadow:0 0 0 2px #fff,0 3px 8px rgba(0,0,0,.35);z-index:99999`;
         document.body.append(b);
       }

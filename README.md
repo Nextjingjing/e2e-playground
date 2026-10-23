@@ -10,7 +10,15 @@ playground.
 
 Recorded by `show-and-tell` from one prompt: a real browser on the live site, real mouse and
 keyboard, highlights, captions, a title card, fast-forwarded waiting and an original
-synthesized music bed (no copyright). Full 1-minute video: *YouTube link coming soon*.
+synthesized music bed (no copyright).
+
+### Made by another AI (Qwen) with these skills
+
+The skills are plain [Agent Skills](https://agentskills.io) folders, so they are not tied to
+Claude. These two videos were recorded by **Qwen** following `show-and-tell`:
+
+[![test my skill 01 — demo recorded by Qwen](https://img.youtube.com/vi/Jf53DOyJzww/hqdefault.jpg)](https://www.youtube.com/watch?v=Jf53DOyJzww)
+[![test skill 02 — demo recorded by Qwen](https://img.youtube.com/vi/EHDntvZT6Xc/hqdefault.jpg)](https://www.youtube.com/watch?v=EHDntvZT6Xc)
 
 ## Skills
 

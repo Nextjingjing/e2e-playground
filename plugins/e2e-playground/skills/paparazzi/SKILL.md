@@ -180,6 +180,12 @@ matches nothing just no-ops (see the `if (!rect) return`), so a wrong CSS
 selector produces a screenshot that "succeeded" with a missing annotation,
 not an error.
 
+Also check that **no annotation covers another or hides the text it points at**: a
+badge on top of the next badge, a callout over the button label, a spotlight dimming the
+caption. Place each callout at a free side of its target (above, below, right, left —
+first one that touches neither the target nor another callout) and keep callouts short;
+when a row is too crowded, split it into two screenshots instead of stacking marks.
+
 ## See also
 
 `hold-my-hand` (same plugin) builds a click-by-click HTML guide on top of these
