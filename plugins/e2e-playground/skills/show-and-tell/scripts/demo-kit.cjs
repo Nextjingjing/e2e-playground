@@ -219,6 +219,7 @@ async function startSession(opts) {
   const redact = redactConfig(opts.redact ?? {});
   if (redact) await context.addInitScript(redactInit, redact);
   const page = await context.newPage();
+  page.on("console", m => { if (m.text().startsWith("[redact]")) console.warn(m.text()); });
   const t0 = Date.now();
   const marks = [];
   const shots = [];
@@ -379,9 +380,89 @@ function makeDemo(page, marks, t0, { view, font, theme, shots, shotDir }) {
       return path.join(shotDir, file);
     },
 
+    // Highlight just the text that matters inside a big element — a terminal (xterm.js DOM
+    // rows), a log, a <pre>, a long paragraph — instead of the whole element.
+    // what: string (exact, case-insensitive) or RegExp; within: optional locator to search in.
+    // { line: true } widens the box to the whole line the match is on.
+    async highlightText(what, label, ms = 2200, { within, line = false, shot } = {}) {
+      // spaces in a plain string match any run of whitespace incl. &nbsp; (terminals render spaces as U+00A0)
+      const src = what instanceof RegExp
+        ? { s: what.source, f: what.flags.replace("g", "") }
+        : { s: String(what).trim().split(/\s+/).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s+"), f: "i" };
+      const scope = within ? await within.elementHandle() : null;
+      const find = () => page.evaluate(({ src, scope, line }) => {
+        const re = new RegExp(src.s, src.f);
+        const rootEl = scope || document.body;
+        const LINE = ".xterm-rows > div, tr, li, p, pre, td, th, h1, h2, h3, h4, label, button, div";
+        const textNodes = el => {
+          const out = [];
+          const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
+            acceptNode: n => n.parentElement && !n.parentElement.closest("#__demo_root,#__demo_redact,script,style") ? 1 : 2,
+          });
+          let n;
+          while ((n = w.nextNode())) out.push(n);
+          return out;
+        };
+        // match against whole lines: xterm.js and syntax highlighters split one line over many spans
+        const done = new Set();
+        for (const tn of textNodes(rootEl)) {
+          const row = tn.parentElement.closest(LINE) || tn.parentElement;
+          if (done.has(row)) continue;
+          done.add(row);
+          const nodes = textNodes(row);
+          const text = nodes.map(n => n.nodeValue).join("");
+          const m = re.exec(text);
+          if (!m) continue;
+          // map match offsets back to (node, offset)
+          const at = pos => {
+            let acc = 0;
+            for (const n of nodes) {
+              if (pos <= acc + n.nodeValue.length) return [n, pos - acc];
+              acc += n.nodeValue.length;
+            }
+            const last = nodes[nodes.length - 1];
+            return [last, last.nodeValue.length];
+          };
+          const r = document.createRange();
+          r.setStart(...at(m.index));
+          r.setEnd(...at(m.index + m[0].length));
+          row.scrollIntoView({ block: "nearest" });
+          const rects = [...r.getClientRects()].filter(x => x.width > 0);
+          if (!rects.length) continue;
+          const first = rects[0];
+          const same = rects.filter(x => Math.abs(x.top - first.top) < 2); // stay on one visual line
+          const left = Math.min(...same.map(x => x.left)), right = Math.max(...same.map(x => x.right));
+          if (line) {
+            const rr = row.getBoundingClientRect();
+            return { x: rr.left, y: first.top, width: rr.width, height: first.height };
+          }
+          return { x: left, y: first.top, width: right - left, height: first.height };
+        }
+        return null;
+      }, { src, scope, line });
+      let b = null;
+      await demo.waitApp(async () => {
+        const until = Date.now() + 30000;
+        while (!(b = await find()) && Date.now() < until) await sleep(250);
+      }, "wait for text");
+      if (!b) throw new Error(`highlightText: "${what}" is not on screen as text. A canvas/WebGL terminal draws no DOM text — use xterm.js's DOM renderer (see references/surfaces.md), or highlight a known box with demo.highlightBox().`);
+      await moveTo(b.x + b.width / 2, b.y + b.height / 2);
+      return demo.highlightBox(b, label, ms, { shot });
+    },
+
     // highlight(locator, label, ms, { shot: "title" }) also saves a still while it shows.
-    async highlight(locator, label, ms = 2200, { shot } = {}) {
+    async highlight(locator, label, ms = 2200, opts = {}) {
       const b = await boxOf(locator);
+      return demo.highlightBox(b, label, ms, opts);
+    },
+
+    // Highlight a box in page pixels ({ x, y, width, height }). Refuses a box covering most of the
+    // screen: an orange frame round everything (a whole terminal, a whole page) points at nothing.
+    async highlightBox(b, label, ms = 2200, { shot, whole = false } = {}) {
+      if (!whole && b.width * b.height > 0.5 * view.width * view.height) {
+        throw new Error(`highlight "${label || ""}" would cover ${Math.round((100 * b.width * b.height) / (view.width * view.height))}% of the screen. ` +
+          "Highlight the part that matters: demo.highlightText(text, label) inside terminals/logs/long text, a smaller locator, or pass { whole: true } if the whole screen really is the point.");
+      }
       marks.push({ t: now(), end: now() + ms / 1000, label: "highlight: " + (label || ""), kind: "highlight" });
       await page.evaluate(({ b, label, ms }) => {
         const root = document.getElementById("__demo_root");
@@ -426,8 +507,29 @@ function makeDemo(page, marks, t0, { view, font, theme, shots, shotDir }) {
             { x: target.x + target.w - lw, y: target.y + target.h + g }, // below, right-aligned
             { x: target.x + target.w + g, y: target.y },         // right, top-aligned
             { x: target.x - lw - g, y: target.y + target.h - lh },  // left, bottom-aligned
+            // the same sides slid sideways, to reach empty space (end of a terminal line, margins)
+            ...[120, 240, 360, 480, 640].flatMap(dx => [
+              { x: target.x + target.w + g + dx, y: cy },
+              { x: cx + dx, y: target.y - lh - g }, { x: cx - dx, y: target.y - lh - g },
+              { x: cx + dx, y: target.y + target.h + g }, { x: cx - dx, y: target.y + target.h + g },
+            ]),
           ].map(c => ({ x: Math.min(Math.max(8, c.x), W - lw - 8), y: Math.min(Math.max(8, c.y), H - lh - 8), w: lw, h: lh }));
-          const free = candidates.find(c => !obstacles.some(o => hit(c, o)));
+          // page text near the target: a label should land on empty space, not on other content
+          const textRects = [];
+          const tw = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+            acceptNode: n => n.parentElement && n.nodeValue.trim() && !n.parentElement.closest("#__demo_root,#__demo_redact,script,style") ? 1 : 2,
+          });
+          for (let n; (n = tw.nextNode()) && textRects.length < 3000;) {
+            const pr = n.parentElement.getBoundingClientRect();
+            if (pr.bottom < 0 || pr.top > H || pr.right < 0 || pr.left > W) continue;
+            const rg = document.createRange();
+            rg.selectNodeContents(n);
+            for (const x of rg.getClientRects()) if (x.width > 0) textRects.push({ x: x.left, y: x.top, w: x.width, h: x.height });
+          }
+          const covered = c => textRects.reduce((s, t) => s + area(c, t), 0);
+          const freeOnes = candidates.filter(c => !obstacles.some(o => hit(c, o)));
+          // among spots that touch no box/caption/label, the one covering the least page text
+          const free = freeOnes.length ? freeOnes.reduce((a, c) => (covered(c) < covered(a) ? c : a)) : null;
           // nowhere fully free: least covered spot, never on the target itself if avoidable
           const best = free || candidates.slice().sort((a, c) =>
             obstacles.reduce((s, o, i) => s + area(a, o) * (i === 0 ? 10 : 1), 0) -

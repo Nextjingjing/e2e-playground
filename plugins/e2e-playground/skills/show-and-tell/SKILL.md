@@ -13,7 +13,7 @@ that is why the rules below are strict about faking, and relaxed about everythin
 Bundled:
 
 - `scripts/demo-kit.cjs` — recorder: login once (not filmed), visible cursor + click ripple,
-  `click / type / scanText / pasteAndEnter / highlight / caption / card / waitApp`,
+  `click / type / scanText / pasteAndEnter / highlight / highlightText / caption / card / waitApp`,
   opening title card recorded as its own clip.
 - `scripts/post.py` — trims, fast-forwards dead time, puts the card first, adds music,
   joins cases into the combined video.
@@ -143,10 +143,18 @@ await demo.card({ tag: "Case 1", title: "Fill the slot", lines: ["Scan any palle
 await s.finish();
 ```
 
+Point at the part that matters, never at everything. `demo.highlight()` refuses a box over
+half the screen — a frame round a whole terminal, log or page points at nothing. Inside big
+elements use `demo.highlightText("42 passed", "label")` (or a RegExp, `{ line: true }` for the
+whole row); it finds the words even when a terminal splits a line over many spans. Terminals:
+`references/surfaces.md` (DOM renderer needed, or the text — and any secret — is invisible
+to the kit).
+
 Nothing explanatory may cover anything else. A label over the button it explains, or a
 caption over the proof, makes the viewer miss exactly the moment you staged. The kit places
-each highlight label at the first free spot around the box (above, below, right, left, …)
-that touches neither the box, the caption nor another label, and moves the caption to the
+each highlight label at the free spot around the box (above, below, right, left, slid
+sideways, …) that touches neither the box, the caption nor another label and covers the
+least page text, and moves the caption to the
 other edge while a highlight sits under it. Keep labels short (≤ ~40 characters) so a free
 spot exists; when two things matter at once, highlight both in one `Promise.all` rather than
 stacking text. The review (§6) checks for overlaps too.

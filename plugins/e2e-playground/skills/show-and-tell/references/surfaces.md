@@ -32,7 +32,41 @@ const s = await kit.startSession({
 // s.page is the first window: demo.click / caption / highlight / shot work unchanged
 ```
 
-## Terminal / CLI (VHS)
+## Terminal / CLI
+
+A terminal is one big element, so `demo.highlight(terminalLocator)` would frame the whole
+screen — the kit refuses that. Point at the text instead.
+
+### A terminal in the browser (ttyd, xterm.js, a web IDE) — preferred, full kit
+
+```js
+await demo.scanText("npm test");                                 // typing = real keystrokes
+await demo.waitApp(page.getByText(/Tests:\s+\d+ passed/), "tests");
+await demo.highlightText("42 passed", "All 42 tests pass");      // just the words
+await demo.highlightText(/FAIL\s+src\/cart/, "this suite fails", 2500, { line: true }); // the whole line
+```
+
+Requires the terminal to render **DOM text** (xterm.js DOM renderer): do not load the WebGL /
+canvas addon; with ttyd pass its option that turns WebGL off (see `ttyd --help`; older builds:
+`-t rendererType=dom`). Check: `document.querySelector(".xterm-rows").textContent` shows the
+screen's text. With a canvas renderer, `highlightText` cannot find the text **and redaction
+cannot see secrets** — the kit prints a `[redact]` warning; switch renderer before recording.
+
+### VHS (no browser): highlight and cover in post
+
+VHS draws the terminal itself, so no overlay runs. Keep secrets out of the screen entirely:
+put them in environment variables inside a `Hide` … `Show` block, never `Type` a token or
+password, and never `cat` a config file that holds one. Highlight a row afterwards with
+ffmpeg, using the known geometry (`Set Padding`, `Set FontSize`, `Set LineHeight`):
+
+```
+row_y = padding + row_index * font_size * line_height        # row_index from 0, top of the terminal
+drawbox=x=<padding>:y=<row_y>:w=iw-2*<padding>:h=<font_size*line_height>:color=orange@0.9:t=4:enable='between(t,12,15)'
+```
+
+`post.py cover` puts solid bars over rows that must not be seen.
+
+### VHS tape
 
 ```
 Output out/01-case.mp4

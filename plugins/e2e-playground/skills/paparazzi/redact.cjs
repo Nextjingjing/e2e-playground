@@ -12,7 +12,7 @@
 
 // Built-in patterns: on by default. Each is { name, src, flags }.
 const DEFAULT_PATTERNS = [
-  { name: "email", src: String.raw`[\w.+-]+@[\w-]+(?:\.[\w-]+)+`, flags: "g" },
+  { name: "email", src: String.raw`[\w.+-]+@[\w-]+(?:\.[\w-]+)*\.[A-Za-z]{2,}\b`, flags: "g" }, // needs a letter TLD: not app@1.0.0
   { name: "jwt", src: String.raw`eyJ[\w-]{8,}\.[\w-]{8,}\.[\w-]{4,}`, flags: "g" },
   { name: "bearer", src: String.raw`\bBearer\s+[\w.~+/=-]{12,}`, flags: "gi" },
   { name: "api key", src: String.raw`\b(?:sk|pk|rk)[-_](?:live|test|proj|ant)?[-_]?[A-Za-z0-9_-]{16,}`, flags: "g" },
@@ -154,6 +154,19 @@ function redactInit(cfg) {
   };
   // observe from the very first byte: browsers paint partial pages before DOMContentLoaded
   start();
+
+  // Text drawn on a canvas (WebGL/canvas terminals, charts, PDF viewers) is invisible to this
+  // scanner, so secrets there would be filmed. Say so loudly; the kit prints "[redact]" lines.
+  setTimeout(() => {
+    const canvases = [...document.querySelectorAll("canvas")].filter(c => {
+      const r = c.getBoundingClientRect();
+      return r.width * r.height > 0.15 * innerWidth * innerHeight;
+    });
+    const xtermDomText = document.querySelector(".xterm-rows")?.textContent.trim();
+    if (canvases.length && !xtermDomText) {
+      console.warn("[redact] a large <canvas> is on screen: its text cannot be scanned. For terminals use the DOM renderer (no WebGL/canvas addon) or keep secrets out of it (env vars, Hide/Show).");
+    }
+  }, 2500);
 }
 
 module.exports = { redactInit, redactConfig, DEFAULT_PATTERNS, DEFAULT_SELECTORS };
