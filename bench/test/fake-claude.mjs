@@ -9,6 +9,12 @@ const out = obj => process.stdout.write(JSON.stringify(obj) + "\n");
 
 out({ type: "system", subtype: "init", cwd: process.cwd(), tools: ["Read", "Glob", "Grep", "Skill"] });
 if (scenario === "timeout") setInterval(() => {}, 1000);
+else if (scenario === "grandchild") {
+  // like claude.exe: a child process that inherits stdout and outlives the parent
+  const { spawn } = await import("node:child_process");
+  spawn(process.execPath, ["-e", "setTimeout(() => {}, 60000)"], { stdio: ["ignore", "inherit", "inherit"] });
+  setInterval(() => {}, 1000);
+}
 else {
   out({ type: "assistant", message: { content: [{ type: "tool_use", id: "t1", name: "Skill", input: { skill: "e2e-playground:brat-e2e" } }] } });
   out({ type: "assistant", message: { content: [{ type: "tool_use", id: "t2", name: "Read", input: { file_path: ".env" } }] } });

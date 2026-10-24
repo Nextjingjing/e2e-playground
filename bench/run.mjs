@@ -49,12 +49,23 @@ export async function runSuite(o) {
     const slot = results[ci].arms[arm].runs;
     const spent = (await o.usage()) - usage0;
     if (spent >= o.maxUsd) { slot.push({ i, skipped: "budget" }); return; }
-    const run = await runClaude({ fixtureDir: path.join(o.root, "fixtures", c.fixture), prompt: c.prompt, withPlugin: arm === "with",
+    const attempt = () => runClaude({ fixtureDir: path.join(o.root, "fixtures", c.fixture), prompt: c.prompt, withPlugin: arm === "with",
       pluginDir: o.pluginDir, model, tools: c.tools, maxTurns: c.maxTurns, timeoutMs: c.timeoutSec * 1000, env: o.env || {} });
+    // An error before the first turn (provider stall, API error) says nothing about the skill: retry once,
+    // and if it fails again keep the run out of the score and count it as an infra error.
+    const infra = r => r.isError && r.turns === 0;
+    let run = await attempt(), attempts = 1;
+    if (infra(run)) { if (!o.keep) fs.rmSync(run.workspace, { recursive: true, force: true }); run = await attempt(); attempts = 2; }
+    if (infra(run)) {
+      slot.push({ i, infraError: true, attempts, error: run.error, durationMs: run.durationMs });
+      if (!o.keep) fs.rmSync(run.workspace, { recursive: true, force: true });
+      if (!o.quiet) console.log(`${c.name} [${arm} #${i + 1}] INFRA ERROR ${run.error}`);
+      return;
+    }
     const grades = [];
     for (const g of c.graders) grades.push(await grade(run, g, { judge: o.judge }));
     const score = scoreRun(grades);
-    slot.push({ i, score, grades, tokens: run.tokens, turns: run.turns, durationMs: run.durationMs,
+    slot.push({ i, attempts, score, grades, tokens: run.tokens, turns: run.turns, durationMs: run.durationMs,
       isError: run.isError, error: run.error, final: run.final, tools: run.toolUses.map(t => t.name),
       costUsd: runCost(run.tokens, PRICES[model] || PRICES["openai/gpt-6.1-sol"]) });
     if (!o.keep) fs.rmSync(run.workspace, { recursive: true, force: true });
@@ -63,9 +74,9 @@ export async function runSuite(o) {
 
   for (const r of results) {
     for (const arm of Object.keys(r.arms)) {
-      const a = r.arms[arm], done = a.runs.filter(x => !x.skipped).sort((x, y) => x.i - y.i);
+      const a = r.arms[arm], done = a.runs.filter(x => !x.skipped && !x.infraError).sort((x, y) => x.i - y.i);
       const s = scoreCase(done.map(x => x.score));
-      a.mean = s.mean; a.passAll = s.passAll;
+      a.mean = s.mean; a.passAll = s.passAll; a.infraErrors = a.runs.filter(x => x.infraError).length;
       a.runs = a.runs.sort((x, y) => x.i - y.i);
       r.tokens = r.tokens || {}; r.durationMs = r.durationMs || {}; r.costUsd = r.costUsd || {};
       r.tokens[arm] = done.reduce((t, x) => ({ input: t.input + x.tokens.input, cacheCreation: t.cacheCreation + x.tokens.cacheCreation, cacheRead: t.cacheRead + x.tokens.cacheRead, output: t.output + x.tokens.output }), { input: 0, cacheCreation: 0, cacheRead: 0, output: 0 });
@@ -92,10 +103,10 @@ export function summary({ round, cases }) {
   const lines = [`# ${round.skill} benchmark ${round.date}`, "",
     `commit ${round.commit} · agent ${round.model} (effort ${round.effort}) · judge ${round.judge}`,
     `SKILL.md ${round.skillWords} words · description ${round.descriptionWords} words · OpenRouter spend $${round.spendUsd.toFixed(4)}`, "",
-    "| case | with | without | Δ | safety pass^k | tokens out (with) | avg s (with) | est. $ (with) |", "|---|---|---|---|---|---|---|---|"];
+    "| case | with | without | Δ | safety pass^k | infra errors | tokens out (with) | avg s (with) | est. $ (with) |", "|---|---|---|---|---|---|---|---|---|"];
   for (const c of cases) {
     const w = c.arms.with || {}, wo = c.arms.without || {};
-    lines.push(`| ${c.name} | ${f2(w.mean)} | ${f2(wo.mean)} | ${f2(c.delta)} | ${c.tags.includes("safety") ? (w.passAll ? "yes" : "**NO**") : ""} | ${c.tokens.with ? c.tokens.with.output : "–"} | ${c.durationMs.with != null ? (c.durationMs.with / 1000).toFixed(0) : "–"} | ${c.costUsd.with != null ? c.costUsd.with.toFixed(3) : "–"} |`);
+    lines.push(`| ${c.name} | ${f2(w.mean)} | ${f2(wo.mean)} | ${f2(c.delta)} | ${c.tags.includes("safety") ? (w.passAll ? "yes" : "**NO**") : ""} | ${(w.infraErrors || 0) + (wo.infraErrors || 0) || ""} | ${c.tokens.with ? c.tokens.with.output : "–"} | ${c.durationMs.with != null ? (c.durationMs.with / 1000).toFixed(0) : "–"} | ${c.costUsd.with != null ? c.costUsd.with.toFixed(3) : "–"} |`);
   }
   return lines.join("\n") + "\n";
 }

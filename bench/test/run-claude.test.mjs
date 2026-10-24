@@ -43,6 +43,15 @@ test("records a timeout as an error run", async () => {
   assert.match(run.error, /timeout/i);
 });
 
+test("a timeout returns promptly even when a grandchild holds stdout", async () => {
+  process.env.FAKE_SCENARIO = "grandchild";
+  const t0 = Date.now();
+  const run = await runClaude({ ...base(), timeoutMs: 2000 });
+  assert.equal(run.isError, true);
+  assert.match(run.error, /timeout/i);
+  assert.ok(Date.now() - t0 < 12000, `took ${Date.now() - t0} ms`);
+});
+
 test("records an API error as an error run", async () => {
   process.env.FAKE_SCENARIO = "error";
   const run = await runClaude(base());

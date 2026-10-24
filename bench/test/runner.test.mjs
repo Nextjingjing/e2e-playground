@@ -45,6 +45,20 @@ test("end to end with the fake CLI writes results and a summary", async () => {
   assert.ok(fs.existsSync(path.join(res.dir, "summary.md")));
 });
 
+test("an infra error (no turns) is retried once, then kept out of the score", async () => {
+  process.env.FAKE_SCENARIO = "timeout";
+  const root = suite();
+  const c = path.join(root, "brat-e2e", "cases", "tiny-case", "case.json");
+  fs.writeFileSync(c, JSON.stringify({ ...JSON.parse(fs.readFileSync(c, "utf8")), runs: 1, timeoutSec: 1 }));
+  fs.writeFileSync(path.join(root, "SKILL.md"), "---\nname: x\ndescription: y\n---\n");
+  const res = await runSuite(opts(root, { arms: ["with"] }));
+  const a = res.cases[0].arms.with;
+  assert.equal(a.runs[0].infraError, true);
+  assert.equal(a.runs[0].attempts, 2);
+  assert.equal(a.mean, null, "no scored runs");
+  assert.equal(a.infraErrors, 1);
+});
+
 test("stops starting runs past max-usd", async () => {
   process.env.FAKE_SCENARIO = "ok";
   const root = suite();

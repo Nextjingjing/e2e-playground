@@ -30,8 +30,16 @@ export async function runClaude({ fixtureDir, prompt, withPlugin, pluginDir, mod
 
   await new Promise(resolve => {
     const child = spawn(cmd, [...pre, ...args], { cwd: workspace, env: { ...process.env, ...env, CLAUDE_CONFIG_DIR: configDir }, stdio: ["pipe", "pipe", "pipe"] });
-    let buf = "", stderr = "", gotResult = false;
-    const timer = setTimeout(() => { run.isError = true; run.error = `timeout after ${timeoutMs} ms`; child.kill(); }, timeoutMs);
+    let buf = "", stderr = "", gotResult = false, done = false;
+    const finish = () => { if (done) return; done = true; clearTimeout(timer); run.durationMs = Date.now() - started; resolve(); };
+    // On Windows claude.exe can leave a child holding stdout, so "close" may never come (a round saw
+    // 1450 s runs with a 300 s limit): kill the whole tree and stop waiting a few seconds later.
+    const timer = setTimeout(() => {
+      run.isError = true; run.error = `timeout after ${timeoutMs} ms`;
+      if (process.platform === "win32") { try { execFileSync("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore" }); } catch {} }
+      else child.kill("SIGKILL");
+      setTimeout(finish, 5000);
+    }, timeoutMs);
     child.stdout.on("data", d => {
       buf += d;
       let i;
@@ -53,10 +61,8 @@ export async function runClaude({ fixtureDir, prompt, withPlugin, pluginDir, mod
     });
     child.stderr.on("data", d => { stderr += d; });
     child.on("close", code => {
-      clearTimeout(timer);
-      run.durationMs = Date.now() - started;
       if (!gotResult && !run.isError) { run.isError = true; run.error = `exited ${code} without a result: ${stderr.slice(-300)}`; }
-      resolve();
+      finish();
     });
     child.stdin.end(prompt);
   });
