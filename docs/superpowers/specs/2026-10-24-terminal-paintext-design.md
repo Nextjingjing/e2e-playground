@@ -139,6 +139,16 @@ ruled out by the design, but it doesn't have to work in v1.
 
 ## Constraints
 
+- **Spike result (2026-10-24):** ConPTY carries Thai input and output intact through
+  PowerShell 5.1 and cmd once UTF-8 is set (`[Console]::OutputEncoding` / `chcp 65001`;
+  capture sends these itself, hidden). xterm.js's DOM renderer draws Thai correctly except
+  sara am after a tone mark (`น้ำ`, `ค่ำ`): the นิคหิต disappears. Drawing it as
+  นิคหิต + tone + า fixes it. This is a display-only rewrite in the replay; the capture keeps
+  the original bytes.
+- **DB proof** (user asked): paintext needs no DB connection of its own. A case proves a DB
+  write by typing the query in the same terminal after the action (`sqlcmd`, `psql`,
+  `sqlite3`, or the app's own `list`), marked as the proof step. Back up first, as in
+  show-and-tell's Protect phase. The E2E test does this with a SQLite fixture.
 - **Thai output must work** (user's decision). CLIs may print Thai; combining vowels and tone
   marks must render correctly in the replay (no broken cell grid, no floating marks). Start
   the build with a spike: capture Thai output through ConPTY on PowerShell 5.1 and cmd
