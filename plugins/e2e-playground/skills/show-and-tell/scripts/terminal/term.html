@@ -1,0 +1,81 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>terminal</title>
+<link rel="stylesheet" href="node_modules/@xterm/xterm/css/xterm.css">
+<link rel="stylesheet" href="frame.css">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--tab-bg, #0c0c0c); }
+  #term { position: absolute; top: 46px; left: 0; right: 0; bottom: 0; padding: 14px 18px; box-sizing: border-box; }
+  .xterm .xterm-viewport { overflow-y: hidden; }
+</style>
+</head>
+<body>
+<div class="bar">
+  <div class="tab"><span class="ic"></span><span class="title"></span><span class="x">✕</span></div>
+  <span class="plus">+</span>
+  <div class="win"><span>—</span><span>☐</span><span>✕</span></div>
+</div>
+<div id="term"></div>
+<script src="node_modules/@xterm/xterm/lib/xterm.js"></script>
+<script src="thai.cjs"></script>
+<script>
+// paintext replay: draws the bytes a real shell printed (an asciicast v2 capture) with xterm.js's
+// DOM renderer, so demo-kit can find, highlight and redact the text. Nothing is typed or drawn by
+// hand: input appears because the shell echoed it during the real run.
+const IDLE_GAP = 0.8;  // seconds without output that film.cjs turns into an idle (fast-forwarded) span
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+let term, events = [], i = 0, lastT = 0, stream;
+const write = s => new Promise(r => term.write(s, r));
+
+async function load({ cast, theme, title, icon, font }) {
+  const [head, ...lines] = cast.trim().split("\n");
+  const h = JSON.parse(head);
+  events = lines.map(l => JSON.parse(l));
+  document.documentElement.style.setProperty("--tab-bg", theme.background);
+  document.documentElement.style.setProperty("--icon", icon.color);
+  document.querySelector(".tab .ic").textContent = icon.text;
+  const titleEl = document.querySelector(".tab .title");
+  titleEl.textContent = title;
+  const box = document.getElementById("term");
+  term = new Terminal({ cols: h.width, rows: h.height, theme, cursorBlink: false, scrollback: 1000,
+    fontFamily: font || "'Cascadia Mono','Consolas','Leelawadee UI','Noto Sans Mono','Noto Sans Thai',monospace" });
+  term.onTitleChange(t => { titleEl.textContent = t || title; });
+  term.open(box);
+  // largest font size whose cols x rows grid still fits the window
+  for (let size = 26; size >= 10; size--) {
+    term.options.fontSize = size;
+    await sleep(30);
+    const s = box.querySelector(".xterm-screen");
+    if (s.offsetWidth <= box.clientWidth - 36 && s.offsetHeight <= box.clientHeight - 28) break;
+  }
+  stream = new thai.ThaiStream();
+  // everything before "start" (UTF-8 prelude, hidden setup, the clear) is replayed instantly, off camera
+  const start = events.findIndex(e => e[1] === "m" && e[2] === "start");
+  for (; i <= start; i++) if (events[i][1] === "o") await write(stream.push(events[i][2]));
+  lastT = start >= 0 ? events[start][0] : 0;
+  await write(stream.flush());
+}
+
+// Play at recorded speed until: a gap longer than IDLE_GAP (returned, not slept: film.cjs waits it out
+// as idle time), the marker `stop`, or the end.
+async function next(stop) {
+  for (; i < events.length; i++) {
+    const [t, kind, data] = events[i];
+    if (kind === "m") { if (data === stop) { i++; await write(stream.flush()); return { marker: data, done: false }; } continue; }
+    if (kind !== "o") continue;
+    const gap = t - lastT;
+    if (gap > IDLE_GAP) { lastT = t; await write(stream.flush()); return { gap, done: false }; }
+    if (gap > 0) await sleep(gap * 1000);
+    lastT = t;
+    await write(stream.push(data));
+  }
+  await write(stream.flush());
+  return { done: true };
+}
+
+window.paintext = { load, next };
+</script>
+</body>
+</html>

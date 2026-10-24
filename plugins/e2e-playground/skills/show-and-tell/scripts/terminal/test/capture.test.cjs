@@ -4,9 +4,9 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { capture } = require("../capture.cjs");
+const { ordersCast } = require("./helpers.cjs");
 
 const win = process.platform === "win32";
-const FIXTURE = path.join(__dirname, "fixtures", "orders.py");
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), "paintext-"));
 const readCast = file => {
   const [header, ...rest] = fs.readFileSync(file, "utf8").trim().split("\n");
@@ -17,18 +17,6 @@ const afterStart = events => {
   return events.slice(i + 1).filter(e => e[1] === "o").map(e => e[2]).join("");
 };
 
-// Used by film.test.cjs too.
-async function ordersCast(dir) {
-  const out = path.join(dir, "orders.cast");
-  await capture({ shell: "powershell", cwd: dir, out }, [
-    { type: `cd "${dir}"`, hidden: true },
-    { type: `python "${FIXTURE}" --db o.db add A-042 น้ำดื่ม`, expect: /Continue\? \[y\/N\]/ },
-    { type: "y", expect: /บันทึกแล้ว/ },
-    { type: `python "${FIXTURE}" --db o.db list`, mark: "proof" },
-  ]);
-  return out;
-}
-module.exports = { ordersCast };
 
 test("powershell session with prompt, Thai and DB", { skip: !win, timeout: 90000 }, async () => {
   const out = await ordersCast(tmp());

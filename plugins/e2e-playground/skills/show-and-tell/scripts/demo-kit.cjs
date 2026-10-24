@@ -20,6 +20,7 @@
 const fs = require("fs");
 const path = require("path");
 const { redactInit, redactConfig } = require("./redact.cjs");
+const { thaiCells } = require("./terminal/thai.cjs");
 
 const DEFAULT_FONT = "'Leelawadee UI','Noto Sans Thai','Sarabun','Segoe UI','Noto Sans',sans-serif";
 const DEFAULT_VIEW = { width: 1440, height: 900 };
@@ -179,6 +180,7 @@ function sizeInit(px) {
 // ---------- session ----------
 // opts: baseURL, outDir, name, startUrl, login(page) [run once, not recorded],
 //       storageStatePath, view, font, captionPx, projectDir, contextOptions, origin permissions,
+//       beforeStart(page) [runs after the start page loads, before the "start" mark],
 //       redact: { text: ["Real Name", "emp id"], selectors: [".avatar-name"], patterns: [{src, flags}] }
 //               (on by default with built-in credential/PII patterns; false = off)
 async function startSession(opts) {
@@ -232,6 +234,7 @@ async function startSession(opts) {
     }, "open start page");
   }
   await page.evaluate(() => document.fonts.ready).catch(() => {});
+  if (opts.beforeStart) await opts.beforeStart(page); // e.g. load a terminal replay; trimmed off with the page load
   demo.mark("start", "start"); // post.py trims everything before this
 
   async function finish() {
@@ -386,11 +389,12 @@ function makeDemo(page, marks, t0, { view, font, theme, shots, shotDir }) {
     // { line: true } widens the box to the whole line the match is on.
     async highlightText(what, label, ms = 2200, { within, line = false, shot } = {}) {
       // spaces in a plain string match any run of whitespace incl. &nbsp; (terminals render spaces as U+00A0)
-      const src = what instanceof RegExp
-        ? { s: what.source, f: what.flags.replace("g", "") }
-        : { s: String(what).trim().split(/\s+/).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s+"), f: "i" };
+      const plain = s => ({ s: String(s).trim().split(/\s+/).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s+"), f: "i" });
+      // a paintext terminal draws Thai sara am as nikhahit + aa (scripts/terminal/thai.cjs): look for that form too
+      const srcs = what instanceof RegExp ? [{ s: what.source, f: what.flags.replace("g", "") }]
+        : String(what).includes("ำ") ? [plain(what), plain(thaiCells(what))] : [plain(what)];
       const scope = within ? await within.elementHandle() : null;
-      const find = () => page.evaluate(({ src, scope, line }) => {
+      const findOne = src => page.evaluate(({ src, scope, line }) => {
         const re = new RegExp(src.s, src.f);
         const rootEl = scope || document.body;
         const LINE = ".xterm-rows > div, tr, li, p, pre, td, th, h1, h2, h3, h4, label, button, div";
@@ -405,7 +409,9 @@ function makeDemo(page, marks, t0, { view, font, theme, shots, shotDir }) {
         };
         // match against whole lines: xterm.js and syntax highlighters split one line over many spans
         const done = new Set();
+        let found = null;
         for (const tn of textNodes(rootEl)) {
+          if (!tn.nodeValue.trim()) continue;  // layout whitespace under <body> would make the whole page one "row"
           const row = tn.parentElement.closest(LINE) || tn.parentElement;
           if (done.has(row)) continue;
           done.add(row);
@@ -432,14 +438,16 @@ function makeDemo(page, marks, t0, { view, font, theme, shots, shotDir }) {
           const first = rects[0];
           const same = rects.filter(x => Math.abs(x.top - first.top) < 2); // stay on one visual line
           const left = Math.min(...same.map(x => x.left)), right = Math.max(...same.map(x => x.right));
-          if (line) {
-            const rr = row.getBoundingClientRect();
-            return { x: rr.left, y: first.top, width: rr.width, height: first.height };
-          }
-          return { x: left, y: first.top, width: right - left, height: first.height };
+          const rr = row.getBoundingClientRect();
+          const box = line ? { x: rr.left, y: first.top, width: rr.width, height: first.height }
+            : { x: left, y: first.top, width: right - left, height: first.height };
+          // in a terminal the newest output (lowest match) is the result; an earlier hit is usually the typed command
+          if (!row.closest(".xterm-rows")) return box;
+          found = box;
         }
-        return null;
+        return found;
       }, { src, scope, line });
+      const find = async () => { for (const src of srcs) { const b = await findOne(src); if (b) return b; } return null; };
       let b = null;
       await demo.waitApp(async () => {
         const until = Date.now() + 30000;

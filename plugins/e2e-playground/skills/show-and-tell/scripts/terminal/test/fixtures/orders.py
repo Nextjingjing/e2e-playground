@@ -28,6 +28,8 @@ def main():
             print(f"\r[{bar:<10}] {i * 20}%", end="", flush=True)
             time.sleep(0.3)
         print()
+        print("กำลังบันทึก...", flush=True)
+        time.sleep(1.5)  # a real CLI waits for the server here: the replay must fast-forward it
         db.execute("insert or replace into orders values (?, ?)", (a.code, a.name))
         db.commit()
         print("บันทึกแล้ว ✔")
