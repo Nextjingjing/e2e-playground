@@ -1,1 +1,3 @@
 results/
+# fixture .env files hold no secrets (passwords are ****); the repo root ignores .env everywhere
+!fixtures/*/.env

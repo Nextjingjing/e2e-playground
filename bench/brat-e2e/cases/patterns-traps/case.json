@@ -1,0 +1,12 @@
+{
+  "name": "patterns-traps",
+  "tags": ["brat-e2e", "cheap"],
+  "fixture": "logic-only",
+  "prompt": "three playwright questions, answer with the exact code or config for each: (1) after saving the profile form, a toast, the avatar src and GET /api/profile must all show the new name; the backend applies it async within ~5s; I want one retried block of checks. (2) 20 specs run fullyParallel, all log in as the same picker account via storageState and each changes that user's language setting; tests randomly see the wrong language. how do I fix it? (3) we shard the suite over 4 CI machines and want one combined HTML report — what are the steps?",
+  "graders": [
+    { "name": "skill fired", "type": "skill_used", "skill": "brat-e2e", "withOnly": true },
+    { "name": "toPass with an explicit timeout", "type": "final_regex", "pattern": "toPass\\(\\s*\\{[^}]*timeout" },
+    { "name": "one account per worker", "type": "final_regex", "pattern": "parallelIndex|workerIndex|per[- ]worker|each worker|one account per", "flags": "i" },
+    { "name": "blob + merge-reports", "type": "final_regex", "pattern": "merge-reports" }
+  ]
+}

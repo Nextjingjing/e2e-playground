@@ -1,0 +1,11 @@
+{
+  "name": "real-when-it-can",
+  "tags": ["brat-e2e", "cheap"],
+  "fixture": "local-db",
+  "prompt": "write e2e for the send to sorting button on the forklift page. tell me the plan before you write anything.",
+  "graders": [
+    { "name": "skill fired", "type": "skill_used", "skill": "brat-e2e", "withOnly": true },
+    { "name": "plans real tests without asking", "type": "judge", "criteria": "PASS if the main plan is a real end-to-end test that goes through the real UI, the real API and a real (throwaway) database and checks the stock movement row, and it does not stop to ask the user which database or approach to use. FAIL if the main plan is mocked/stubbed API tests, or if it asks the user to choose an approach before planning." },
+    { "name": "checks the stock movement", "type": "final_regex", "pattern": "stock[_ ]?movement", "flags": "i" }
+  ]
+}

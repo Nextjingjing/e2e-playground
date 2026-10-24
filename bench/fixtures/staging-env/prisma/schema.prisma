@@ -1,0 +1,14 @@
+model Order {
+  id        Int             @id @default(autoincrement())
+  code      String          @unique
+  status    String          @default("WAITING")
+  movements StockMovement[]
+}
+
+model StockMovement {
+  id      Int    @id @default(autoincrement())
+  orderId Int
+  order   Order  @relation(fields: [orderId], references: [id])
+  from    String
+  to      String
+}
