@@ -23,6 +23,12 @@ Keep it factual and short; fix a line the moment it turns out wrong.
 - waits: <what to wait for after the action (selector / text)>
 - gotchas: <popup that must be closed, slow polling, element covered by toast, ...>
 
+## Terminal cases (paintext)
+- shell: powershell / cmd / bash (asked: <date>)   size: 110x30   cwd: <path>
+- hidden setup: <commands, one per line>   secrets: env <NAME> (never the value)
+- steps: `<command>` → expect /<text>/ ; ... ; proof step: `<query>` → /<row>/
+- gotchas: <slow command, prompt that needs an answer, output too long → | Select-Object -First N>
+
 ## Expected results (the proof each case shows)
 - <case>: <what appears where, exact text>
 

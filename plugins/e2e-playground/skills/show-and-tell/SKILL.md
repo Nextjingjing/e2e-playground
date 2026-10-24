@@ -20,7 +20,10 @@ Bundled:
 - `scripts/gen_music.py` — synthesizes an original lo-fi bed (no samples, no copyright),
   different per seed. Needs numpy.
 - `references/agent-brief.md` — template brief for one-subagent-per-case recording.
-- `references/surfaces.md` — Electron (kit `electron` option), terminal (VHS), Windows
+- `scripts/terminal/` — **paintext** for terminal / CLI cases: `capture.cjs` runs the real
+  shell in a pty and saves what it printed, `film.cjs` replays it as a kit session (needs
+  `npm install` there once). `agent-log/` films an AI agent's run from its log.
+- `references/surfaces.md` — Electron (kit `electron` option), terminal (paintext; VHS fallback), Windows
   desktop (ffmpeg gdigrab + pywinauto real input), mobile (scrcpy + Maestro). Web is the
   default path below; read this first for anything else — the rules stay the same.
 
@@ -77,6 +80,9 @@ save. Defaults when not stated:
   is short and easy to follow.
 - Setup (creating the order, queue, job...) happens **off camera**. The video starts on the
   screen where the user's story begins.
+- **Terminal / CLI case**: ask which shell the video shows: PowerShell, cmd, Git Bash / bash,
+  or other. Use a choice box if your tool has one. On Windows default to PowerShell. Record the
+  answer in `HANDOFF.md`. It is recorded with paintext (`references/surfaces.md`).
 
 ## 2. Hard rules for what is filmed
 
@@ -147,8 +153,8 @@ Point at the part that matters, never at everything. `demo.highlight()` refuses 
 half the screen — a frame round a whole terminal, log or page points at nothing. Inside big
 elements use `demo.highlightText("42 passed", "label")` (or a RegExp, `{ line: true }` for the
 whole row); it finds the words even when a terminal splits a line over many spans. Terminals:
-`references/surfaces.md` (DOM renderer needed, or the text — and any secret — is invisible
-to the kit).
+paintext in `references/surfaces.md` (a live web terminal needs xterm.js's DOM renderer, or
+the text — and any secret — is invisible to the kit).
 
 Nothing explanatory may cover anything else. A label over the button it explains, or a
 caption over the proof, makes the viewer miss exactly the moment you staged. The kit places

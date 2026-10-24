@@ -11,13 +11,13 @@ trims nothing but squeezes still stretches and adds the card and music.
 |---|---|---|---|
 | Web app | demo-kit (SKILL.md) | `page.mouse` / `page.keyboard` | cursor, highlight, caption in page |
 | Electron | demo-kit with `electron` option | same as web | same as web |
-| Terminal / CLI | VHS `.tape` → mp4 | `Type` / `Enter` at typing speed | caption burned in by ffmpeg |
+| Terminal / CLI | **paintext**: `terminal/capture.cjs` → `terminal/film.cjs` (VHS only as fallback) | steps typed at human speed into a real shell (pty) | full kit, as on the web |
 | Windows desktop | ffmpeg `gdigrab` | pywinauto `click_input()` / `type_keys()` (real OS input) | ffmpeg `drawbox` / `drawtext` |
 | Android | `scrcpy --record` (or `adb shell screenrecord`) | Maestro flow (`tapOn`, `inputText`) | ffmpeg `drawbox` / `drawtext` |
 | iOS | `xcrun simctl io booted recordVideo` | Maestro flow | ffmpeg |
-| HTTP API | record the terminal running `curl` (VHS) | `Type` the request | caption |
+| HTTP API | paintext running `curl` / `Invoke-RestMethod` | type the request | full kit |
 
-Write the marks file yourself for non-web surfaces: note `time.monotonic()` at the start of
+Write the marks file yourself for non-web surfaces other than paintext (it writes its own): note `time.monotonic()` at the start of
 recording, then append `{ "t": …, "end": …, "kind": "idle" }` around every wait for the app,
 `{ "t": …, "kind": "caption", "label": "caption: …" }` when a caption should appear, and
 `{ "t": …, "kind": "start" }` where the story begins.
@@ -37,7 +37,80 @@ const s = await kit.startSession({
 A terminal is one big element, so `demo.highlight(terminalLocator)` would frame the whole
 screen — the kit refuses that. Point at the text instead.
 
-### A terminal in the browser (ttyd, xterm.js, a web IDE) — preferred, full kit
+### paintext (default): run the real shell, then film a replay of what it printed
+
+Filming a real console window is fragile (flicker, no overlays, timing you can't control).
+paintext runs the commands for real in a hidden pseudo-terminal (ConPTY on Windows), saves
+every byte the shell printed with its timing (asciicast v2, `.cast`), and replays those
+bytes in a page that looks like Windows Terminal (PowerShell blue, cmd black, or bash). The
+whole kit then works on it: captions, `highlightText`, cards, shots, redaction, idle
+fast-forward, `post.py`. Nothing on screen is typed or drawn by hand. Commands appear because
+the real shell echoed them while the capture typed them at human speed.
+
+**First ask which shell the video shows** (PowerShell, cmd, Git Bash / bash). Use a choice box
+if your tool has one. On Windows default to PowerShell. The capture runs in that shell, so
+the look always matches where the commands really ran. Record the answer in `HANDOFF.md` and
+`FLOWS.md`.
+
+One-time setup: `cd <skill>/scripts/terminal && npm install` (pty, xterm.js, Playwright).
+Run `npm test` there to check the machine (Windows: about 5 min).
+
+Two stages, so you can check the run before filming and retakes don't repeat side effects:
+
+```js
+// 1. capture: the real run. A step whose text never appears fails here, not in the video.
+const { capture } = require("<skill>/scripts/terminal/capture.cjs");
+await capture({ shell: "powershell", cwd: "C:\\demo", out: "<work>/cases/01/01.cast" }, [
+  { type: "cd C:\\demo; $env:API = 'http://localhost:8000'", hidden: true }, // setup, off camera
+  { type: "mytool orders add A-042 น้ำดื่ม", expect: /Continue\? \[y\/N\]/ },
+  { type: "y", expect: /บันทึกแล้ว/ },
+  { type: "mytool orders list", mark: "proof" },          // the DB proof, in the same terminal
+]);
+
+// 2. film: replay as a demo-kit session
+const { film } = require("<skill>/scripts/terminal/film.cjs");
+const s = await film({ cast: "<work>/cases/01/01.cast", outDir, name: "01-case",
+                      redact: { text: ["<customer name on screen>"] } });   // optional, on top of the built-ins
+try {
+  await s.demo.caption("Add the order, answer y");
+  await s.play("proof");                                   // plays until the "proof" step is done
+  await s.demo.highlightText("A-042", "The new row, read back from the DB");
+  await s.play();                                          // to the end
+} finally {
+  await s.finish();                                        // always: an open browser keeps Node running
+}                                                          // 01-case.webm + 01-case.marks.json → post.py as usual
+```
+
+Steps: `{ type, expect, hidden, mark, enter = true }` or `{ secret: "ENV_NAME" }`. `expect`
+defaults to the shell prompt, and it only looks at output after Enter. Options: `cols`/`rows`
+(110×30), `typeMs` (60), `timeoutMs` (20000), `env`. The CLI form is `node capture.cjs
+steps.cjs`, where the file exports `{ opts, steps }`.
+
+Rules:
+
+- **Secrets**: only through `{ secret: "ENV_NAME" }` (typed from the env var, saved as
+  `‹env:ENV_NAME›`). A capture refuses to save if the output shows an env value it used or
+  something shaped like a credential. Never `echo` a token or `cat` a config that holds one.
+- **Hidden steps** are the off-camera setup. They run first and are followed by a screen
+  clear, so the video starts on a clean prompt. A hidden command that fails ends the capture.
+- **DB proof**: after the action, type the query in the same terminal (`sqlcmd`, `psql`,
+  `sqlite3`, or the app's own `list`) and `mark` that step. Back up first (§3 Protect).
+- **Long output**: shorten it on screen (`| Select-Object -First 20`, `| head -20`) instead of
+  cutting the capture. The replay shows exactly what the shell printed.
+- `highlightText` in a terminal picks the **lowest** match on screen (the newest output, not
+  the typed command). Pass a RegExp or `{ line: true }` when you need something else.
+- `.cast` files stay in the work folder; they are not deliverables. Hidden commands and their
+  output are kept in the `.cast` word for word (only secret inputs become placeholders).
+- PowerShell starts with `-NoProfile`, and nothing is saved to PSReadLine history (bash:
+  `HISTFILE` empty). A custom prompt from your profile won't show up in the video.
+- Redaction in the replay works on whole rows, so names written in Thai or split by colours
+  are still covered.
+- Waits over 0.8 s become idle spans: post.py squeezes them like spinners on the web.
+- Thai: works in PowerShell and cmd (the capture sets UTF-8 itself). The replay draws ำ after
+  a tone mark as ํ + tone + า, because xterm.js loses the circle otherwise. `highlightText("น้ำ")`
+  finds it either way.
+
+### A terminal in the browser (ttyd, xterm.js, a web IDE) — full kit, live
 
 ```js
 await demo.scanText("npm test");                                 // typing = real keystrokes
@@ -52,7 +125,9 @@ canvas addon; with ttyd pass its option that turns WebGL off (see `ttyd --help`;
 screen's text. With a canvas renderer, `highlightText` cannot find the text **and redaction
 cannot see secrets** — the kit prints a `[redact]` warning; switch renderer before recording.
 
-### VHS (no browser): highlight and cover in post
+### Fallback: VHS, only when a real screen capture is required
+
+#### VHS (no browser): highlight and cover in post
 
 VHS draws the terminal itself, so no overlay runs. Keep secrets out of the screen entirely:
 put them in environment variables inside a `Hide` … `Show` block, never `Type` a token or
@@ -66,7 +141,7 @@ drawbox=x=<padding>:y=<row_y>:w=iw-2*<padding>:h=<font_size*line_height>:color=o
 
 `post.py cover` puts solid bars over rows that must not be seen.
 
-### VHS tape
+#### VHS tape
 
 ```
 Output out/01-case.mp4

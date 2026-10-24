@@ -42,7 +42,7 @@ if ($Zip) {
     if (Test-Path $z) { Remove-Item $z }
     # Compress-Archive in PowerShell 5.1 writes "a\b" entry names; other systems need "a/b"
     $archive = [System.IO.Compression.ZipFile]::Open($z, "Create")
-    foreach ($f in Get-ChildItem $s.FullName -Recurse -File | Where-Object { $_.FullName -notmatch "__pycache__" }) {
+    foreach ($f in Get-ChildItem $s.FullName -Recurse -File | Where-Object { $_.FullName -notmatch "__pycache__|node_modules" }) {
       $entry = $s.Name + "/" + $f.FullName.Substring($s.FullName.Length + 1).Replace("\", "/")
       [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive, $f.FullName, $entry) | Out-Null
     }

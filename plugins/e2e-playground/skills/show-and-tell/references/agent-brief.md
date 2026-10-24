@@ -46,6 +46,12 @@ python <skill>/scripts/post.py one <case>.webm "<output dir>/<name>.mp4" --card 
 
 Read-only DB access: `<command>`.
 
+Terminal case (paintext, see `references/surfaces.md`): shell `<powershell|cmd|bash>`, size
+`<110x30>`. Capture first with `<skill>/scripts/terminal/capture.cjs`: hidden setup
+`<commands>`, steps with `expect`, the proof step marked `proof`, secrets only as
+`{ secret: "<ENV_NAME>" }`. Then film with `film.cjs` (`play("proof")` → `highlightText`).
+Captures stay in `<scratch>/cases/<case>/`.
+
 ## Start from FLOWS.md, not the code
 `<work>/FLOWS.md` already has the routes, exact labels, working locators, waits and gotchas
 for every screen, and the setup command. Use it as is. Read product code only when a line in

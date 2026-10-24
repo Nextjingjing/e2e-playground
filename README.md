@@ -56,11 +56,11 @@ Every skill is strongest on web apps but not limited to them; each has a
 | surface | screenshots | video | test |
 |---|---|---|---|
 | Web app | Playwright + Chromium | demo-kit (Playwright) | Playwright Test |
-| Terminal / CLI | VHS (or plain text blocks) | VHS → mp4 | bats-core / pytest |
+| Terminal / CLI | VHS (or plain text blocks) | paintext: real shell run, replayed and filmed (VHS fallback) | bats-core / pytest |
 | Electron | Playwright `_electron` | demo-kit `electron` option | Playwright Test |
 | Windows desktop | pywinauto + Pillow | ffmpeg gdigrab + pywinauto | pytest + pywinauto |
 | Mobile | Maestro CLI / adb | scrcpy + Maestro | Maestro CLI |
-| HTTP API | curl + expected JSON | VHS running curl | Playwright `request` / pytest |
+| HTTP API | curl + expected JSON | paintext running curl | Playwright `request` / pytest |
 
 Paid or closed tools (e.g. Maestro Cloud) are never the default. iOS simulators need Xcode,
 which isn't open source.

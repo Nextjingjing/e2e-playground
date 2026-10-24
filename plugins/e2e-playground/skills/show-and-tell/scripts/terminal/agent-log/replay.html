@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<title>Claude Code</title>
+<link rel="stylesheet" href="../frame.css">
+<style>
+  :root { --bg: #0c0c0c; --bar: #202020; --fg: #d4d4d4; --dim: #8b8b8b; --orange: #d97757;
+          --green: #4ec36a; --red: #e5534b; --blue: #6cb6ff; --line: #3a3a3a; }
+  html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden; }
+  body { font: 25px/1.5 "Cascadia Mono", "Consolas", "Leelawadee UI", monospace; color: var(--fg); --tab-bg: var(--bg); --icon: var(--orange); }
+  .tab .ic { font-size: 18px; }
+  #screen { position: absolute; top: 46px; left: 0; right: 0; bottom: 64px; padding: 14px 28px; overflow: hidden; }
+  #out { white-space: pre-wrap; word-break: break-word; }
+  #status { position: absolute; left: 0; right: 0; bottom: 0; height: 64px; border-top: 1px solid var(--line);
+            display: flex; align-items: center; gap: 28px; padding: 0 28px; font-size: 22px; color: var(--dim); }
+  #status b { color: #fff; font-weight: 600; }
+  #status .tok b { color: var(--orange); }
+  .welcome { border: 1px solid var(--orange); border-radius: 8px; padding: 10px 18px; display: inline-block; margin-bottom: 14px; }
+  .welcome .t { color: var(--orange); }
+  .user { color: #fff; background: #262626; display: block; padding: 6px 12px; border-left: 3px solid var(--dim); }
+  .dot { color: #fff; } .dot.tool { color: var(--green); } .dot.err { color: var(--red); }
+  .tname { color: #fff; font-weight: 700; } .targ { color: var(--fg); }
+  .res { color: var(--dim); }
+  .agent { color: var(--fg); }
+  .err { color: var(--red); }
+  #badge { display: none; position: absolute; top: 64px; right: 28px; padding: 10px 18px; border-radius: 10px;
+           background: rgba(217,119,87,.95); color: #fff; font: 600 24px "Leelawadee UI", "Segoe UI", sans-serif; }
+  .spin { color: var(--orange); }
+  /* split: Claude Code on the left, the real browser recording on the right */
+  body.split { font-size: 21px; }
+  body.split #screen { right: 1168px; padding: 12px 18px; }
+  #vid { display: none; position: absolute; top: 46px; right: 0; width: 1168px; bottom: 64px; background: #1a1a1a;
+         border-left: 1px solid var(--line); }
+  body.split #vid { display: flex; align-items: center; justify-content: center; }
+  #vid .crop { width: 1152px; height: 648px; overflow: hidden; position: relative; background: #fff; }
+  #vid video { position: absolute; left: 0; top: 0; }
+  #vid .cap { position: absolute; top: 12px; left: 16px; color: var(--dim); font-size: 18px; }
+</style>
+</head>
+<body>
+<div class="bar">
+  <div class="tab"><span class="ic">✻</span>Claude Code<span class="x">✕</span></div>
+  <div class="win"><span>—</span><span>☐</span><span>✕</span></div>
+</div>
+<div id="screen"><div id="out"></div></div>
+<div id="status"><span>model <b id="model"></b></span><span class="tok">tokens <b id="tok">0</b></span><span>output <b id="otok">0</b></span><span id="elapsed"></span></div>
+<div id="vid"><span class="cap">Browser ที่ Claude คุม (Playwright MCP) · บันทึกจริง</span><div class="crop"><video id="v" muted preload="auto"></video></div></div>
+<div id="badge"></div>
+<script>
+const out = document.getElementById("out"), screen = document.getElementById("screen"), badge = document.getElementById("badge");
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const fmt = n => n.toLocaleString("en-US");
+function el(cls, text) { const s = document.createElement("span"); s.className = cls; s.textContent = text; return s; }
+function put(...nodes) { nodes.forEach(n => out.appendChild(n)); screen.scrollTop = screen.scrollHeight; }
+async function stream(cls, text, ms) {
+  const s = el(cls, ""); put(s);
+  for (const ch of text) { s.textContent += ch; screen.scrollTop = screen.scrollHeight; await sleep(ms); }
+}
+function indent(text, first, rest) { return text.split("\n").map((l, i) => (i ? rest : first) + l).join("\n"); }
+
+async function run(R) {
+  document.getElementById("model").textContent = R.model;
+  document.querySelector(".tab").lastChild.previousSibling.textContent = R.app;
+  document.querySelector("#vid .cap").textContent = R.videoLabel || "Browser (recorded during the real run)";
+  const v = document.getElementById("v");
+  // keep the browser video at the same real moment as the log: video time = log time - videoOffset
+  const syncVideo = t => {
+    if (!R.video) return;
+    const vt = t - R.videoOffset;
+    if (vt < 0 || vt > v.duration) { v.pause(); return; }
+    if (Math.abs(v.currentTime - vt) > 0.4) v.currentTime = vt;
+    if (v.paused) v.play();
+  };
+  if (R.video) {
+    document.body.classList.add("split"); v.src = R.video;
+    await new Promise(r => (v.readyState >= 1 ? r() : v.addEventListener("loadedmetadata", r, { once: true })));
+    // the page may sit in the top-left part of a bigger frame (R.pageW x R.pageH): scale so that part fills the pane
+    const k = 1152 / (R.pageW || v.videoWidth);
+    v.style.width = v.videoWidth * k + "px"; v.style.height = v.videoHeight * k + "px";
+  }
+  const w = document.createElement("div"); w.className = "welcome";
+  w.append(el("t", "✻ "), el("", `${R.app}\n`), el("res", `  cwd: ${R.cwd}`));
+  put(w, el("", "\n"));
+  put(el("res", "> ")); await sleep(600);
+  await stream("user", R.prompt, 4); put(el("", "\n\n"));
+  // Gaps up to FF_MIN s play in full; longer ones are cut to FF_SHOW s and the badge states the real length.
+  const FF_MIN = 3, FF_SHOW = 1.8;
+  let prev = 0, real = 0;
+  for (const it of R.items) {
+    const gap = it.t - prev; prev = it.t;
+    if (gap > FF_MIN) {
+      const L = R.labels;  // badge words in the viewer's language; the number is always the real gap
+      badge.textContent = `⏩ ${it.kind === "result" ? L.wait : L.think} ${gap.toFixed(0)} ${L.secs}`;
+      badge.style.display = "block"; v.playbackRate = Math.min(16, gap / FF_SHOW);
+      await sleep(FF_SHOW * 1000); badge.style.display = "none"; v.playbackRate = 1;
+    } else if (gap > 0) await sleep(gap * 1000);
+    syncVideo(it.t);
+    document.getElementById("elapsed").textContent = `เวลาจริง ${Math.floor(it.t / 60)}:${String(Math.floor(it.t % 60)).padStart(2, "0")}`;
+    if (it.kind === "tokens") { document.getElementById("tok").textContent = fmt(it.total); document.getElementById("otok").textContent = fmt(it.output); }
+    else if (it.kind === "text") { put(el("dot", "● ")); await stream("agent", indent(it.text, "", "  ") + "\n\n", 5); }
+    else if (it.kind === "tool") { put(el("dot tool", "● "), el("tname", it.name), el("targ", `(${it.arg})\n`)); }
+    else if (it.kind === "result") {
+      const body = it.out || "(no output)";
+      put(el(it.err ? "err" : "res", indent(body, "  ⎿  ", "     ") + "\n\n"));
+    }
+  }
+  await sleep(4000);
+  window.__done = true;
+}
+window.__start = run;
+</script>
+</body>
+</html>

@@ -35,7 +35,7 @@ if [ "${ZIP:-}" = 1 ]; then
   for skill in "$SRC"/*/; do
     name="$(basename "$skill")"
     rm -f "$ROOT/dist/$name.zip"
-    (cd "$SRC" && zip -qr "$ROOT/dist/$name.zip" "$name")   # zip holds the folder itself
+    (cd "$SRC" && zip -qr "$ROOT/dist/$name.zip" "$name" -x '*/node_modules/*' '*/__pycache__/*')   # zip holds the folder itself
     echo "  zip dist/$name.zip"
   done
   echo "Upload each zip in claude.ai: Customize > Skills > + (or Settings > Capabilities > Upload skill)."

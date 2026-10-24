@@ -1,0 +1,12 @@
+/* Windows Terminal style window frame: tab bar with the shell's icon and title, window buttons.
+   Shared by term.html (paintext) and agent-log/replay.html. */
+.bar { position: absolute; top: 0; left: 0; right: 0; height: 46px; background: #202020;
+       display: flex; align-items: flex-end; padding-left: 10px; box-sizing: border-box; }
+.tab { background: var(--tab-bg, #0c0c0c); color: #fff; font: 15px "Segoe UI", sans-serif; height: 38px; width: 280px;
+       border-radius: 8px 8px 0 0; display: flex; align-items: center; gap: 10px; padding: 0 14px; box-sizing: border-box; }
+.tab .ic { color: var(--icon, #d97757); font: 600 15px "Cascadia Mono", Consolas, monospace; white-space: nowrap; }
+.tab .title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tab .x { margin-left: auto; color: #aaa; }
+.plus { color: #ccc; font: 20px "Segoe UI", sans-serif; align-self: center; margin-left: 14px; }
+.win { margin-left: auto; display: flex; color: #ddd; font: 16px "Segoe UI", sans-serif; align-self: stretch; }
+.win span { width: 58px; display: flex; align-items: center; justify-content: center; }
