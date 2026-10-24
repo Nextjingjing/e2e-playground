@@ -1,6 +1,6 @@
 ---
 name: brat-e2e
-description: Write reliable automated end-to-end tests with open-source tools by default (Playwright for web and Electron, bats-core for CLIs, pywinauto for Windows desktop, Maestro CLI for mobile, Playwright request / pytest for HTTP APIs), following Playwright's official best practices — user-facing locators, web-first assertions, isolated tests, stubbed network and data, controlled clock — so they don't flake. Use whenever the user asks to test a feature or flow automatically, "write e2e", "add a Playwright test", "test this CLI", "how do we make sure this keeps working", "ทำ e2e", "เขียนเทสต์ให้หน้านี้", or after building a feature that needs an automated check — even if they don't say which test tool to use.
+description: Write reliable automated end-to-end tests with open-source tools by default (Playwright for web and Electron, bats-core for CLIs, pywinauto for Windows desktop, Maestro CLI for mobile, Playwright request / pytest for HTTP APIs), following Playwright's official best practices — user-facing locators, web-first assertions, isolated tests, the real backend on a throwaway test database where it can run (stubs only for what you can't control), controlled clock — so they don't flake. Use whenever the user asks to test a feature or flow automatically, "write e2e", "add a Playwright test", "test this CLI", "how do we make sure this keeps working", "ทำ e2e", "เขียนเทสต์ให้หน้านี้", or after building a feature that needs an automated check — even if they don't say which test tool to use.
 ---
 
 # E2E tests that don't flake
@@ -27,10 +27,11 @@ something else:
 | Mobile | Maestro CLI flows (Apache-2.0); not Maestro Cloud (paid) |
 | HTTP API | Playwright `request` fixture or pytest + requests |
 
-Examples for each are in `references/surfaces.md`. The rules in section 4
+Examples for each are in `references/surfaces.md`. The rules in sections 4–5
 were written for Playwright but carry over: find things the way a user would (visible text,
-control titles), wait for conditions instead of sleeping, isolate each test, fake the data and
-the clock, and never touch a real database. The rest of this file uses web examples.
+control titles), wait for conditions instead of sleeping, isolate each test, run the real
+stack on a test database you own (never production or a shared one), stub only what you don't
+control, and fix the clock. The rest of this file uses web examples.
 
 ## 3. Learn the project before writing
 
@@ -38,10 +39,77 @@ the clock, and never touch a real database. The rest of this file uses web examp
   `*.mocked.spec.js` vs `*.live.spec.js`), how other specs fake login. Copy their patterns.
 - If there is no Playwright yet, propose `npm init playwright@latest` (or adding
   `@playwright/test`) and wait for a yes before changing dependencies.
-- Find how the feature really works in code: which API calls it makes and what fields the UI
-  reads. Tests stub exactly those.
+- Find how the feature really works in code: which API calls it makes, what fields the UI
+  reads, and what it writes (tables, rows, files, messages).
+- Find how the backend and its database start locally: a `docker-compose.yml` DB service,
+  a `test`/`e2e` env or script, migrations and seed commands, Testcontainers in other tests.
+  This decides section 4.
 
-## 4. Rules for tests that don't flake
+## 4. Real or stubbed? Decide per test
+
+E2E means "as little mocking as possible": the user's click goes through the real frontend,
+the real API and a real database. Stub the parts you don't control or can't make happen on
+purpose. Pick for each test:
+
+| the test checks… | run it | file |
+|---|---|---|
+| the journey works: happy path, rules the backend or DB enforces (status changes, stock rows, permissions, duplicates) | **real**: UI + API + test DB | `*.e2e.spec.*` |
+| an error state: API 500, timeout, offline (`route.abort()`) | stub that one call | `*.mocked.spec.*` |
+| data that is slow or hard to create (10 000 rows, a state reached after many steps) | stub the read | `*.mocked.spec.*` |
+| a third-party service: payment, email, SMS, OAuth, someone else's API | stub it (or its sandbox) | either |
+| UI-only logic: formatting, sorting, timers | stub, or real if it is free | either |
+
+- **Real first; add a stub only for what the real run can't reach.** Don't write the same
+  happy path both ways. A mocked copy of a passing real test adds upkeep and no proof.
+- **Ask with a choice box when the real run is in doubt.** Ask when any of these hold: you
+  found no way to start the backend or its database, starting it needs something missing
+  here (Docker not installed, a VPN, a licence), or the configured database is not local
+  (`.env` / config points at another host). Use AskUserQuestion in Claude Code; in other tools,
+  a short numbered question. Offer exactly:
+  1. start a throwaway test DB (name the command, e.g. `docker compose up -d db`), then real tests;
+  2. mocked only (say what it won't prove);
+  3. stop and set the environment up first.
+  Never offer the shared or production database as a choice. When the backend and a local DB
+  start without trouble, don't ask: write the real tests.
+- **Mocked only** (the user picked it, or nothing can run here): write `*.mocked.spec.*` and
+  state in the report that it proves the UI against the recorded API contract, not that the
+  backend works. Name what would make it real.
+
+**Which database a real test may use.** Only a database the tests own and can wipe: a
+docker compose service, a CI service container, Testcontainers, or a database or schema
+created for this run. Use the same engine and major version as production (not SQLite or an
+in-memory stand-in for Postgres).
+
+**Never production, a shared dev or staging database, or one with real customer data.** This
+holds even when `.env` already points there and the user says it is faster. Tell them why in
+one line: the tests write rows, would corrupt other people's data, and would flake on their
+activity. Then start the throwaway one. Make the suite refuse by itself:
+
+```js
+// global-setup.js: the suite only runs against a throwaway local database
+module.exports = async () => {
+  const url = new URL(process.env.E2E_DATABASE_URL || "");
+  if (!["localhost", "127.0.0.1", "::1", "db"].includes(url.hostname))
+    throw new Error(`E2E refuses database host "${url.hostname}": start the test DB (docker compose up -d db)`);
+  // then: migrate (e.g. npx prisma migrate reset --force) with DATABASE_URL = E2E_DATABASE_URL
+};
+```
+
+Start the backend for the tests with `webServer` in `playwright.config` and give it
+`DATABASE_URL: process.env.E2E_DATABASE_URL`, so the app and the tests use the same test DB.
+
+**Data in a real test.**
+- Create what each test needs before it runs, through the API (`request` fixture) or a
+  factory/SQL helper in a fixture. Never build state by clicking through other screens.
+- Give every row a unique key (`E2E-${test.info().workerIndex}-${Date.now()}`), so tests
+  run in parallel and can't see each other's data.
+- Reset the database before the run (migrate/reset in global setup), not after it: a failed
+  run then leaves its data to look at.
+- Assert through the UI first. For results the UI doesn't show (a stock movement row, an
+  audit entry), read them back through the API or a read-only query. Never write rows by hand
+  to make a step "happen": the test must drive the app.
+
+## 5. Rules for tests that don't flake
 
 Each rule follows Playwright's official guidance (links in *Sources*).
 
@@ -61,11 +129,12 @@ races the page. No fixed `waitForTimeout` sleeps.
 **Keep every test isolated.** Each test sets up its own data and state (`beforeEach`, or a
 setup function per test), so tests pass alone, in any order, and in parallel.
 
-**Control data and the network.** Don't depend on systems you don't own, and never on a real
-or shared database. Stub with `page.route()` + `route.fulfill({ json })`; register a catch-all
-first and specific routes after (later routes win). For realistic payloads, record once with
-`routeFromHAR(..., { update: true })` and replay. Record every non-GET request in the stub
-and assert on it — that proves what the UI *sent*, and that nothing else was written.
+**Control data and the network.** Real tests own their data (section 4). In a mocked test,
+stub with `page.route()` + `route.fulfill({ json })`; register a catch-all first and specific
+routes after (later routes win). For realistic payloads, record once with
+`routeFromHAR(..., { update: true })` against the test backend and replay. Record every
+non-GET request in the stub and assert on it — that proves what the UI *sent*, and that
+nothing else was written.
 
 **Keep secrets out of tests and their artifacts.** Specs, fixtures and HAR files get
 committed; traces, videos and failure screenshots get uploaded by CI.
@@ -92,10 +161,36 @@ the end.
 **No screenshots as assertions** unless the user asks for visual regression; they're brittle
 across OS/browser versions. Keep traces for debugging instead.
 
-## 5. Shape of a test file
+## 6. Shape of a test file
+
+A real test (`*.e2e.spec.js`): the app runs against the test DB through `webServer`.
 
 ```js
-// What the feature does, in one or two lines. Every API call is stubbed — no real database.
+// Send to Sorting moves a waiting order to SORTING and books one stock movement. Real UI, API and test DB.
+const { test, expect } = require("@playwright/test");
+
+test("sends a waiting order to Sorting", async ({ page, request }) => {
+  const code = `E2E-${test.info().workerIndex}-${Date.now()}`;
+  const res = await request.post("/api/orders", { data: { code, status: "WAITING" } }); // or a DB factory fixture
+  const order = await res.json();
+
+  await page.goto("/forklift");
+  const row = page.getByRole("row", { name: new RegExp(code) });
+  await row.getByRole("button", { name: "Send to Sorting" }).click();
+  await expect(page.getByText("Done")).toBeVisible();
+  await expect(row).toHaveCount(0);
+
+  const after = await (await request.get(`/api/orders/${order.id}`)).json(); // what the screen doesn't show
+  expect(after.status).toBe("SORTING");
+  expect(after.stockMovements).toHaveLength(1);
+});
+```
+
+A mocked test (`*.mocked.spec.js`) for what the real run can't reach, here a clock-driven
+counter:
+
+```js
+// What the feature does, in one or two lines. Every API call is stubbed: this checks the UI only.
 const { test, expect } = require("@playwright/test");
 
 test.use({ timezoneId: "UTC" });
@@ -131,13 +226,15 @@ test("shows how long an order has waited and keeps counting", async ({ page }) =
 Name tests by behaviour ("hides the wait once loading starts"), one behaviour per test, and
 cover the negative cases (when the thing must *not* show) alongside the happy path.
 
-## 6. Run, then report honestly
+## 7. Run, then report honestly
 
 - Run only the new spec first: `npx playwright test path/to/spec --reporter=list`.
 - If something fails, open the trace (`npx playwright show-trace ...`) before changing the
   test. Fix the test only when the test is wrong; if the app is wrong, report it.
-- Report pass/fail counts and run time. If a long `runFor` makes a test slow, switch to
-  `fastForward`.
+- Report pass/fail counts and run time, and which tests ran real (and on which test DB)
+  vs mocked. If a long `runFor` makes a test slow, switch to `fastForward`.
+- For CI with real tests: run the DB as a service container (or Testcontainers), migrate in
+  global setup, and keep the database URL in CI secrets.
 - For CI: `npx playwright install chromium --with-deps`, `trace: "on-first-retry"`, run on
   every PR. Lint with `@typescript-eslint/no-floating-promises` to catch missing `await`.
 
@@ -146,6 +243,13 @@ cover the negative cases (when the thing must *not* show) alongside the happy pa
 - Playwright — Best Practices: https://playwright.dev/docs/best-practices
 - Playwright — Locators (priority order): https://playwright.dev/docs/locators
 - Playwright — Mock APIs (`route`, `fulfill`, HAR): https://playwright.dev/docs/mock
+- Playwright — API testing (prepare server state, check postconditions via API):
+  https://playwright.dev/docs/api-testing
+- Playwright — Web server (start the backend for tests): https://playwright.dev/docs/test-webserver
+- Cypress — Best Practices (seed the DB per test, don't build state through the UI, clean up
+  before tests): https://docs.cypress.io/app/core-concepts/best-practices
+- Kent C. Dodds — The Testing Trophy (E2E = "as little as possible" mocking):
+  https://kentcdodds.com/blog/the-testing-trophy-and-testing-classifications
 - Playwright — Clock: https://playwright.dev/docs/clock
 - Testing Library — Guiding Principles ("The more your tests resemble the way your software
   is used, the more confidence they can give you."): https://testing-library.com/docs/guiding-principles

@@ -2,7 +2,8 @@
 
 The rules in `SKILL.md` stay the same on every surface: find things the way a user would
 (visible text, control titles), wait for a condition instead of sleeping, isolate each test,
-fake the data and the clock, never touch a real database. Only the tool changes. **Default
+run the real backend on a throwaway test database (never production or a shared one), stub only
+what you don't control, fix the clock. Only the tool changes. **Default
 to the open-source tool in each row** unless the project already uses another.
 
 | surface | test tool | license |
@@ -35,7 +36,8 @@ Contents: [Terminal](#terminal--cli) · [Electron](#electron) · [Windows deskto
 (`--separate-stderr` splits them). In Python projects, `pytest` +
 `subprocess.run(..., capture_output=True, text=True)` does the same.
 
-- Point the tool at a temp directory / fixture file / stub server, never real data.
+- Point the tool at a temp directory, fixture files, or the real backend on a throwaway test
+  database; never production or shared data. Stub a server only for what can't run here.
 - Fix time: set `TZ` and any "now" override the tool supports.
 - Assert on the lines that matter, not on the whole output (spinners, colours and timing
   noise break exact matches).
@@ -79,7 +81,8 @@ def test_edit_opens_form():
 
 - `dlg.print_control_identifiers()` lists titles/control types to copy exact labels.
 - Use `wait("visible", timeout=...)`, not `time.sleep`.
-- Point the app at a test config / local stub server, never production data.
+- Point the app at a test config: the real backend on a throwaway test database, or a local
+  stub server for what can't run here; never production data.
 - WinAppDriver exists but isn't the default; prefer pywinauto unless the project already
   uses Appium/WinAppDriver.
 
@@ -118,3 +121,5 @@ test("order 42 reports its pick time", async ({ request }) => {
 ```
 
 or pytest + requests against a test server with a throwaway database — never the real one.
+Create the order the test reads first (`request.post`) with a unique code instead of relying
+on id 42 existing; the example keeps it short.
