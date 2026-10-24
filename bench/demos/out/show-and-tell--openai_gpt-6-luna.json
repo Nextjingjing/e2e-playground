@@ -1,0 +1,22 @@
+{
+  "skill": "show-and-tell",
+  "model": "openai/gpt-6-luna",
+  "costUsd": 0.029832714999997734,
+  "durationMs": 705547,
+  "turns": 1,
+  "tokens": {
+    "input": 3,
+    "cacheCreation": 482,
+    "cacheRead": 53541,
+    "output": 169
+  },
+  "isError": false,
+  "error": "",
+  "skillFired": true,
+  "artifacts": [
+    "send-to-sorting.mp4",
+    "send-to-sorting.review.json",
+    "_work"
+  ],
+  "final": "The background app server was stopped by the harness timeout after recording. The video is already rendered and verified; A-001 remains `SORTING` in the demo database until it’s reset."
+}

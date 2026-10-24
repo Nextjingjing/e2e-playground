@@ -1,22 +1,95 @@
 # e2e-playground
 
-Claude Code skills for **guides anyone can follow**, **screenshots**, **demo videos**,
-**tests that don't flake** and **numbers about people** — five kids in one end-to-end
-playground.
+Skills that make an AI coding agent **prove a feature works**. From one prompt it records a demo video,
+writes e2e tests that don't flake, takes annotated screenshots and writes a guide a colleague can
+follow. It does all of it on your **real running app**, not on a mock-up.
 
-## Demo
+## One prompt, two models, the exact cost
+
+Everything below was made by an agent from **a single prompt** on a small sample warehouse app
+(Express + Postgres), with no human edits. The agents were Claude Code driving two OpenAI models
+through OpenRouter. Each price is the exact OpenRouter charge for that run.
+
+| one prompt → | **GPT-6.1 Sol** ($2 / $10 per 1M tokens) | **GPT-6 Luna** ($0.10 / $0.50) |
+|---|---|---|
+| 🎬 `show-and-tell`: demo video | **$0.30** · 5.6 min · 27 s clip | **$0.03** · 12 min · 19 s clip |
+| 🧪 `brat-e2e`: e2e tests | **$0.24** · 5 min · 4 tests, 20/20 green | **$0.03** · 23 min · 2 tests, 10/10 green |
+| 📸 `paparazzi`: annotated screenshots | **$0.15** · 11 min · 2 shots + guide | **$0.02** · 25 min* · 2 shots + guide |
+
+<sub>*Luna finished the work but left the app server running, so the session hit the 25-minute limit.
+"Green" counts every test repeated 5 times (`--repeat-each=5`) to catch flakiness.
+The scripts and results are in [`bench/demos/`](bench/demos/).</sub>
+
+### 🎬 show-and-tell: *"record a short demo of order A-001 being sent to Sorting"*
+
+| GPT-6.1 Sol · $0.30 | GPT-6 Luna · $0.03 |
+|---|---|
+| ![Sol's demo: title card, A-001 highlighted, real click, success message, only the other orders remain](docs/media/sat-sol.gif) | ![Luna's demo: title card, real click, row gone, success highlighted](docs/media/sat-luna.gif) |
+
+Both agents clicked the real button in a real browser and then checked the database read-only:
+A-001 is `SORTING`, with exactly one movement. Sol adds before-and-after highlights. Luna's cut is
+plainer but correct, at a tenth of the price.
+
+### 🧪 brat-e2e: *"write e2e tests for send-to-sorting and make sure they pass"*
+
+![Sol's Playwright suite running in PowerShell: 4 passed, dev database unchanged](docs/media/brat-sol.gif)
+
+This is Sol's suite running for real, filmed with show-and-tell's terminal recorder. Sol did all of this
+on its own:
+
+- created its **own test database** (`wms_forklift_e2e`), fingerprinted the dev data first and checked
+  afterwards that it hadn't changed
+- wrote three tests against the real backend (send an order, list only waiting orders, reject a stale
+  row another operator already sent) and one mocked test (button disabled while pending, retry after
+  HTTP 500)
+- **broke the backend three times on purpose** to prove each test can fail, then put it back
+
+Luna wrote a smaller suite that is just as safe: a throwaway Postgres in memory (`tmpfs`) and a guard that
+refuses any database that isn't local or whose name doesn't end in `_e2e`.
+
+### 📸 paparazzi: *"annotated screenshots for a one-page quick guide"*
+
+| GPT-6.1 Sol · $0.15 | GPT-6 Luna · $0.02 |
+|---|---|
+| ![Sol: table outlined as 1, Send button as 2 with leader lines](docs/media/paparazzi-sol-1.png) ![Sol: success message outlined as 3](docs/media/paparazzi-sol-2.png) | ![Luna: badges 1-3 on the page, no outlines](docs/media/paparazzi-luna-2.png) |
+
+Sol drew outlines and leader lines at 2× scale and wrote the guide, including what to do when sending
+fails. Luna placed badges only, and one is clipped at the edge. Usable, but not pretty.
+
+**In short:** Luna is about **10× cheaper** and still produced working, safe results. Sol is faster and
+more polished.
+
+## Does the skill actually help? The benchmark
+
+The same scenarios were run **with the skill and without it**, three runs each. They were graded by regex
+checks plus a Haiku judge. The harness is in [`bench/`](bench/README.md) (`node bench/run.mjs`).
+
+| skill | agent | score **with** skill | without | picked the skill itself | round cost |
+|---|---|---|---|---|---|
+| `brat-e2e` | GPT-6 Luna | **0.77** | 0.39 | 16 / 21 | $0.54 |
+| `brat-e2e` | GPT-6.1 Sol | **0.67** | 0.64 | 12 / 21 | $2.76 |
+| `show-and-tell` | GPT-6.1 Sol | **0.82** | 0.66 | 21 / 21 | $1.53 |
+| `show-and-tell` | GPT-6 Luna | **0.74** | 0.58 | 16 / 21 | $0.17 |
+
+- **The cheaper model gains the most.** Told *"the DB in .env is just my local one, fine to wipe"*,
+  Luna without the skill planned to wipe the team's seeded dev database in 3 runs out of 3. With the
+  skill it kept that data and planned a separate test database every time.
+- Sol already knows most of it. For Sol, the skill mostly adds consistency, and it plans better demo
+  videos (web demo plan 0.78 vs 0.39 without).
+- Still open: neither model reliably *asks* before touching a staging environment. Each case moves by
+  up to ±1/3 from run to run (see [`bench/README.md`](bench/README.md)).
+
+## More demos
 
 ![show-and-tell touring nextjingjing.github.io: search, open a post, dark mode, archives](docs/demo.gif)
 
 Recorded by `show-and-tell` from one prompt: a real browser on the live site, real mouse and
-keyboard, highlights, captions, a title card, fast-forwarded waiting and an original
+keyboard, highlights, captions, a title card, waiting fast-forwarded and an original
 synthesized music bed (no copyright).
 
 A SQLBolt tutorial with Thai captions, also from one prompt ("ทำคลิปสอนใช้ sqlbolt"):
 
 [![show-and-tell teaching sqlbolt.com: read a lesson, type a query, get every task ticked, continue](https://img.youtube.com/vi/hNvjIyoIa-8/hqdefault.jpg)](https://youtu.be/hNvjIyoIa-8)
-
-### Made by another AI (Qwen) with these skills
 
 The skills are plain [Agent Skills](https://agentskills.io) folders, so they are not tied to
 Claude. These two videos were recorded by **Qwen** following `show-and-tell`:
@@ -42,9 +115,12 @@ environment variables and filmed off camera; `brat-e2e` keeps secrets out of spe
 and CI artifacts; and this repo has GitHub secret scanning with push protection, so a
 commit containing a credential is refused.
 
-The guide, screenshot and test skills keep away from real databases: data comes from
-stubbed API responses, and the clock is fixed so times in pictures and tests are stable.
-`show-and-tell` is the exception on purpose — it exists to prove the feature works on the real
+The guide and screenshot skills keep away from real databases: data comes from stubbed API
+responses, and the clock is fixed so times in pictures are stable. `brat-e2e` decides per test:
+the real backend on a separate throwaway database when one can be started safely (it refuses any
+database that isn't local or isn't named as a test DB), stubs when the backend can't run or the
+case is a rare failure, and it asks before going near staging or shared data.
+`show-and-tell` proves the feature on the real system on purpose — it exists to prove the feature works on the real
 system, so it backs up the database first and only reads from it outside the filmed clicks.
 Its video tools: ffmpeg and Python with numpy.
 

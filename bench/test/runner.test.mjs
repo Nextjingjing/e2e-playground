@@ -81,3 +81,14 @@ test("stops starting runs past max-usd", async () => {
   assert.ok(all.some(r => r.skipped === "budget"), "some runs skipped for budget");
   assert.ok(all.some(r => !r.skipped), "the first run still happened");
 });
+
+test("saved tool inputs don't carry the local user's home path", async () => {
+  const { scrubPaths } = await import("../run.mjs");
+  const home = os.homedir();
+  const ws = path.join(os.tmpdir(), "bench-ws-abc123");
+  const s = `git -C "${ws}\\.claude" log && ls ${ws.replace(/\\/g, "/")}/src && cat ${home}\\x.txt`;
+  const out = scrubPaths(s, ws);
+  assert.ok(!out.includes(path.basename(home)), out);
+  assert.match(out, /<workspace>\\\.claude/);
+  assert.match(out, /<workspace>\/src/);
+});

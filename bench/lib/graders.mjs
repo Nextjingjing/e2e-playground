@@ -91,7 +91,8 @@ export function makeJudge({ model = "haiku", env = {} } = {}) {
     child.stdout.on("data", d => { out += d; });
     child.stderr.on("data", d => { err += d; });
     child.on("close", () => {
-      fs.rmSync(configDir, { recursive: true, force: true });
+      // Windows can still hold the folder for a moment (EPERM); a leftover temp dir must not kill the round
+      try { fs.rmSync(configDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch {}
       try { const j = JSON.parse(out); if (j.is_error) reject(new Error(j.subtype || "judge error")); else resolve(String(j.result || "")); }
       catch { reject(new Error(`judge gave no JSON: ${err.slice(-200)}`)); }
     });

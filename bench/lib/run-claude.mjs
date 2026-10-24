@@ -66,6 +66,6 @@ export async function runClaude({ fixtureDir, prompt, withPlugin, pluginDir, mod
     });
     child.stdin.end(prompt);
   });
-  fs.rmSync(configDir, { recursive: true, force: true });
+  try { fs.rmSync(configDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch {}
   return run;
 }

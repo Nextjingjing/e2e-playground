@@ -18,8 +18,16 @@ export function claudeEnv({ effort = "medium", judgeModel = "anthropic/claude-ha
   };
 }
 
-export async function openrouterUsage() {
-  const res = await fetch("https://openrouter.ai/api/v1/key", { headers: { Authorization: `Bearer ${openrouterKey()}` } });
-  if (!res.ok) throw new Error(`OpenRouter key lookup failed: HTTP ${res.status}`);
-  return (await res.json()).data.usage;
+// A dropped connection or a 5xx is retried: one failed lookup must not end a whole benchmark round.
+export async function openrouterUsage({ fetchImpl = fetch, tries = 5, delayMs = 3000 } = {}) {
+  for (let t = 1; ; t++) {
+    try {
+      const res = await fetchImpl("https://openrouter.ai/api/v1/key", { headers: { Authorization: `Bearer ${openrouterKey()}` } });
+      if (!res.ok) throw new Error(`OpenRouter key lookup failed: HTTP ${res.status}`);
+      return (await res.json()).data.usage;
+    } catch (e) {
+      if (t >= tries) throw e;
+      await new Promise(r => setTimeout(r, delayMs * t));
+    }
+  }
 }

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Forklift</title>
+<style>
+  body { font: 16px system-ui, sans-serif; margin: 24px; }
+  table { border-collapse: collapse; min-width: 420px; }
+  td, th { border-bottom: 1px solid #ddd; padding: 8px 12px; text-align: left; }
+  #msg { margin: 12px 0; min-height: 1.4em; }
+  #msg.ok { color: #13734b; } #msg.err { color: #b00020; }
+</style>
+</head>
+<body>
+<h1>Forklift — waiting orders</h1>
+<div id="msg" aria-live="polite"></div>
+<table>
+  <thead><tr><th>Order</th><th>Status</th><th></th></tr></thead>
+  <tbody id="rows"></tbody>
+</table>
+<script>
+const rows = document.getElementById("rows"), msg = document.getElementById("msg");
+
+function show(text, ok) {
+  msg.textContent = text;
+  msg.className = ok ? "ok" : "err";
+  msg.setAttribute("role", ok ? "status" : "alert");
+}
+
+async function load() {
+  const list = await (await fetch("/api/orders?status=WAITING")).json();
+  rows.innerHTML = "";
+  for (const o of list) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${o.code}</td><td>${o.status}</td><td><button>Send to Sorting</button></td>`;
+    tr.querySelector("button").addEventListener("click", () => send(o, tr));
+    rows.appendChild(tr);
+  }
+}
+
+async function send(order, tr) {
+  const btn = tr.querySelector("button");
+  btn.disabled = true;
+  try {
+    const res = await fetch(`/api/orders/${order.id}/send-to-sorting`, { method: "POST" });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+    tr.remove();
+    show(`Done: ${order.code} sent to Sorting`, true);
+  } catch (e) {
+    btn.disabled = false;
+    show(`Could not send ${order.code}: ${e.message}`, false);
+  }
+}
+
+load();
+</script>
+</body>
+</html>

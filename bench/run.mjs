@@ -5,6 +5,7 @@
 // Writes bench/results/<stamp>/results.json and summary.md. Needs OPENROUTER_API_KEY.
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
 import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { runClaude } from "./lib/run-claude.mjs";
@@ -14,7 +15,10 @@ import { claudeEnv, openrouterUsage } from "./lib/openrouter.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 // USD / 1M tokens, from OpenRouter's /api/v1/models pricing (prompt, completion, input_cache_write, input_cache_read)
-const PRICES = { "openai/gpt-6.1-sol": { in: 2, out: 10, cacheWrite: 2.5, cacheRead: 0.1 } };
+const PRICES = {
+  "openai/gpt-6.1-sol": { in: 2, out: 10, cacheWrite: 2.5, cacheRead: 0.1 },
+  "openai/gpt-6-luna": { in: 0.1, out: 0.5, cacheWrite: 0.125, cacheRead: 0.01 },
+};
 
 function loadCases(root, skill, { tag, caseName } = {}) {
   const dir = path.join(root, skill, "cases");
@@ -29,6 +33,15 @@ function wordCounts(skillFile) {
   const words = s => (s.match(/\S+/g) || []).length;
   const desc = m ? (m[1].match(/^description:\s*(.*)$/m) || [, ""])[1] : "";
   return { skillWords: words(m ? m[2] : text), descriptionWords: words(desc) };
+}
+
+// Tool inputs are saved for regrading; the workspace and home paths in them hold the local user name.
+export function scrubPaths(text, workspace) {
+  const forms = p => [...new Set([p, p.replace(/\\/g, "/")])];
+  let out = text;
+  for (const f of forms(workspace)) out = out.split(f).join("<workspace>");
+  for (const f of forms(os.homedir())) out = out.split(f).join("~");
+  return out;
 }
 
 async function pool(jobs, n, fn) {
@@ -56,10 +69,10 @@ export async function runSuite(o) {
     // and if it fails again keep the run out of the score and count it as an infra error.
     const infra = r => r.isError && r.turns === 0;
     let run = await attempt(), attempts = 1;
-    if (infra(run)) { if (!o.keep) fs.rmSync(run.workspace, { recursive: true, force: true }); run = await attempt(); attempts = 2; }
+    if (infra(run)) { if (!o.keep) try { fs.rmSync(run.workspace, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch {} run = await attempt(); attempts = 2; }
     if (infra(run)) {
       slot.push({ i, infraError: true, attempts, error: run.error, durationMs: run.durationMs });
-      if (!o.keep) fs.rmSync(run.workspace, { recursive: true, force: true });
+      if (!o.keep) try { fs.rmSync(run.workspace, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch {}
       if (!o.quiet) console.log(`${c.name} [${arm} #${i + 1}] INFRA ERROR ${run.error}`);
       return;
     }
@@ -70,9 +83,9 @@ export async function runSuite(o) {
       isError: run.isError, error: run.error, final: run.final, tools: run.toolUses.map(t => t.name),
       // kept short so tool graders can be re-scored later (regrade.mjs) without bloating the file
       toolUses: run.toolUses.map(t => ({ name: t.name, input: Object.fromEntries(Object.entries(t.input || {})
-        .map(([k, v]) => [k, (typeof v === "string" ? v : JSON.stringify(v)).slice(0, 200)])) })),
+        .map(([k, v]) => [k, scrubPaths(typeof v === "string" ? v : JSON.stringify(v), run.workspace).slice(0, 200)])) })),
       costUsd: runCost(run.tokens, PRICES[model] || PRICES["openai/gpt-6.1-sol"]) });
-    if (!o.keep) fs.rmSync(run.workspace, { recursive: true, force: true });
+    if (!o.keep) try { fs.rmSync(run.workspace, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch {}
     if (!o.quiet) console.log(`${c.name} [${arm} #${i + 1}] score ${score.toFixed(2)}${run.isError ? " ERROR " + run.error : ""}`);
   });
 

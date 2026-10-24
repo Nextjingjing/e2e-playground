@@ -1,0 +1,24 @@
+{
+  "skill": "paparazzi",
+  "model": "openai/gpt-6.1-sol",
+  "costUsd": 0.1533142000000005,
+  "durationMs": 641214,
+  "turns": 1,
+  "tokens": {
+    "input": 3,
+    "cacheCreation": 495,
+    "cacheRead": 27260,
+    "output": 39
+  },
+  "isError": false,
+  "error": "",
+  "skillFired": false,
+  "artifacts": [
+    "01-waiting-orders.png",
+    "02-sent-to-sorting.png",
+    "capture.cjs",
+    "guide.md",
+    "verification.json"
+  ],
+  "final": "The app server was stopped when its background time limit expired. The saved screenshots and guide are unaffected.\n\nTo start it again, run `npm start` from the project folder."
+}

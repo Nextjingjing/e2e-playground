@@ -1,0 +1,25 @@
+{
+  "skill": "paparazzi",
+  "model": "openai/gpt-6-luna",
+  "costUsd": 0.021961924999999383,
+  "durationMs": 1500392,
+  "turns": 58,
+  "tokens": {
+    "input": 105,
+    "cacheCreation": 41407,
+    "cacheRead": 983535,
+    "output": 13572
+  },
+  "isError": true,
+  "error": "timeout after 1500000 ms",
+  "skillFired": true,
+  "artifacts": [
+    "01-waiting-orders.png",
+    "02-sent-to-sorting.png",
+    "capture.cjs",
+    "guide.md",
+    "redact.cjs",
+    "REVIEW.md"
+  ],
+  "final": "Created and verified the quick guide in `demo-out/`:\n\n- `guide.md` — numbered steps with relative links to the screenshots\n- `01-waiting-orders.png` — waiting-orders table and Send to Sorting button\n- `02-sent-to-sorting.png` — success message after sending order A-001\n- `REVIEW.md` — visual review notes for both images\n- `capture.cjs` and `redact.cjs` — reusable capture script and redaction safety net\n\nThe app was driven with Playwright against the live Express app and seeded demo database. The script resets A-001 to `WAITING` before capture so it can be rerun consistently. I used A-001 as the example order; the badges are guide annotations, not app UI. The app server is still running on port 3000."
+}

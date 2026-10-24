@@ -1,0 +1,21 @@
+{
+  "skill": "brat-e2e",
+  "model": "openai/gpt-6.1-sol",
+  "costUsd": 0.23887630000000115,
+  "durationMs": 285188,
+  "turns": 39,
+  "tokens": {
+    "input": 93,
+    "cacheCreation": 35615,
+    "cacheRead": 758292,
+    "output": 8851
+  },
+  "isError": false,
+  "error": "",
+  "skillFired": true,
+  "artifacts": [
+    "dev-db-before.sha256",
+    "test-run.txt"
+  ],
+  "final": "Added Playwright tests and verified they pass.\n\n- **Final run: 20 passed in 16.4s** — four tests repeated five times.\n- Output saved to **[demo-out/test-run.txt](demo-out/test-run.txt)**.\n- Real tests cover successful send, persisted status and movement, duplicate rejection, waiting-only filtering, and stale-row handling.\n- Mocked test covers disabled-button state and retry after HTTP 500.\n- Temporarily introduced three backend defects; the corresponding tests failed as expected. All mutations were restored—no application code changes remain.\n\nI chose a separate `wms_forklift_e2e` database in the existing local Postgres instance. The suite verified the demo database’s order and movement rows stayed unchanged.\n\nRerun with:\n```sh\nnpm run test:e2e\n```"
+}

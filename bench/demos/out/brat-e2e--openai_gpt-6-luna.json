@@ -1,0 +1,20 @@
+{
+  "skill": "brat-e2e",
+  "model": "openai/gpt-6-luna",
+  "costUsd": 0.03423621999999682,
+  "durationMs": 1378744,
+  "turns": 1,
+  "tokens": {
+    "input": 3,
+    "cacheCreation": 527,
+    "cacheRead": 44550,
+    "output": 265
+  },
+  "isError": false,
+  "error": "",
+  "skillFired": true,
+  "artifacts": [
+    "test-run.txt"
+  ],
+  "final": "The earlier manual port-check process was stopped by its timeout. It was separate from the final Playwright run, which passed all 10 tests and was saved to `demo-out/test-run.txt`."
+}

@@ -86,3 +86,19 @@ per round; show-and-tell 14–15 of 15). Runs where the skill didn't fire score 
 The judge (Haiku) misreads long plans with many AND-ed conditions: split such rubrics into one regex
 grader per requirement plus one short judge, and re-score old rounds with `node bench/regrade.mjs <round>`
 (it reuses the saved final messages; only judge calls cost anything) before comparing.
+
+## Other models
+
+Pass `--model <OpenRouter id>` and add its price to `PRICES` in `run.mjs` (used only for the per-case
+estimate; the round's spend comes from OpenRouter). GPT-6 Luna rounds (2026-10-24, bad3256) are in
+`rounds/*-luna.json`: with the skill vs without, brat-e2e 0.77 vs 0.39 and show-and-tell 0.74 vs 0.58 for
+$0.54 and $0.17 a round. The cheaper model gains more from the skills than GPT-6.1 Sol does.
+
+## Real-run demos
+
+`node demos/run-demo.mjs <show-and-tell|brat-e2e|paparazzi> <model>` gives one real task to the agent on
+a fresh copy of `fixtures/mini-wms` (Express + Postgres, needs its dev DB running: `podman compose up -d db`
+in that folder). It records the exact OpenRouter cost, the time taken and the files produced in
+`demos/out/<skill>--<model>.json`, and prints the workspace path. Run demos one at a time: the cost is the
+change in the key's usage, so parallel runs would mix their costs. The README's GIFs and screenshots come
+from these runs.
