@@ -48,17 +48,19 @@ test("prompt and Thai visible", { skip: !win, timeout: 120000 }, async () => {
 
 test("highlightText in a terminal points at the latest match", { skip: !win, timeout: 120000 }, async () => {
   const s = await film({ cast, outDir: tmp(), name: "latest" });
-  await s.play("proof");
-  const pending = s.demo.highlightText("A-042", "row");
-  await s.page.waitForSelector(".__demo_hl");
-  const hlTop = await s.page.$eval(".__demo_hl", el => el.getBoundingClientRect().top + 8);
-  const rowTop = await s.page.$$eval(".xterm-rows > div", ds => {
-    const hits = ds.filter(d => /A-042/.test(d.textContent));
-    return hits[hits.length - 1].getBoundingClientRect().top;
-  });
-  await pending;
-  await s.finish();
-  assert.ok(Math.abs(hlTop - rowTop) < 4, `highlight at y=${hlTop}, last A-042 row at y=${rowTop}`);
+  let hlTop, rowTop;
+  try {
+    await s.play("proof");
+    const pending = s.demo.highlightText("A-042", "row");
+    await s.page.waitForSelector(".__demo_hl");
+    hlTop = await s.page.$eval(".__demo_hl", el => el.getBoundingClientRect().top + 8);
+    rowTop = await s.page.$$eval(".xterm-rows > div", ds => {
+      const hits = ds.filter(d => /A-042/.test(d.textContent));
+      return hits.map(d => Math.round(d.getBoundingClientRect().top));
+    });
+    await pending;
+  } finally { await s.finish(); }
+  assert.ok(Math.abs(hlTop - rowTop[rowTop.length - 1]) < 4, `highlight at y=${hlTop}, A-042 rows at y=${rowTop}`);
 });
 
 test("film produces webm and marks", { skip: !win, timeout: 180000 }, async () => {
