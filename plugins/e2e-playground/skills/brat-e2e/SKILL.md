@@ -50,7 +50,8 @@ database. Stub only what you don't control or can't make happen on purpose.
 | a third-party service (payment, email, SMS, OAuth, someone else's API) | stub it or use its sandbox | either |
 | UI-only logic (formatting, sorting, timers) | stub, or real if free | either |
 
-- **Real first; stub only what the real run can't reach.** Never write the same happy path both ways.
+- **Real first; stub only what the real run can't reach.** Never write the same happy path
+  both ways: a mocked copy of a passing real test adds upkeep and no proof.
 - **Ask with a choice box if any of these is true**, even when you could start a test DB
   yourself: no way found to start the backend or DB; something missing here (Docker, VPN,
   licence); the configured DB (`.env`, config) is not local; the user asked for a database
@@ -78,7 +79,8 @@ database. Stub only what you don't control or can't make happen on purpose.
 
 **Data in real tests**: create each test's data first through the API or a factory fixture
 (never by clicking through other screens); unique keys per test
-(`E2E-${test.info().workerIndex}-${Date.now()}`); reset before the run, not after. Assert in
+(`E2E-${test.info().workerIndex}-${Date.now()}`); reset before the run, not after (a failed
+run then leaves its data to look at). Assert in
 the UI first; read back what the UI doesn't show via the API or a read-only query. Never
 write result rows by hand to make a step "happen".
 
@@ -90,7 +92,7 @@ write result rows by hand to make a step "happen".
   `getByAltText` → `getByTitle` → `getByTestId`; no CSS/XPath; narrow by chaining
   (row first, then its button).
 - **Web-first assertions**: `await expect(locator).toBeVisible()` retries; never
-  `expect(await locator.isVisible())`; no `waitForTimeout`.
+  `expect(await locator.isVisible()).toBe(true)` (checks once and races the page); no `waitForTimeout`.
 - **Isolated**: each test makes its own data and state; passes alone, in any order, in parallel.
 - **Mocked tests** record every non-GET request with `page.on("request")` and assert on it
   (what the UI sent, nothing else written).

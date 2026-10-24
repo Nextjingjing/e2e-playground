@@ -135,6 +135,21 @@ test("shows how long an order has waited and keeps counting", async ({ page }) =
 Realistic stub payloads: record once with `routeFromHAR(..., { update: true })` against the
 test backend and replay.
 
+## Locators, naming, debugging
+
+- `npx playwright codegen <url>` suggests resilient locators. Narrow with chaining and
+  `.filter({ hasText })`: find the row first, then the button inside it.
+- Copy the project's spec naming if it has one (e.g. `*.mocked.spec.js` vs `*.live.spec.js`);
+  otherwise use `*.e2e.spec.*` for real and `*.mocked.spec.*` for stubbed.
+- No Playwright yet: `npm init playwright@latest` (or add `@playwright/test`), after a yes.
+- On a failure: `npx playwright show-trace test-results/<test>/trace.zip` before changing the
+  test. Keep traces for debugging; screenshots as assertions are brittle across OS/browser
+  versions, so use them only when the user asks for visual regression.
+- Licences of the defaults: Playwright Apache-2.0, bats-core MIT, pywinauto BSD-3,
+  Maestro CLI Apache-2.0.
+- Testing Library's principle behind "test what the user sees": "The more your tests resemble
+  the way your software is used, the more confidence they can give you."
+
 ## Clock
 
 - Only need a fixed "now": `page.clock.setFixedTime(...)` (Playwright's first choice).
