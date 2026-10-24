@@ -23,5 +23,5 @@ export function scoreCase(scores) {
 
 // USD for one run from its token counts; prices are USD per 1M tokens.
 export function runCost(t, price) {
-  return ((t.input + t.cacheCreation) * price.in + t.cacheRead * (price.cacheRead ?? price.in) + t.output * price.out) / 1e6;
+  return (t.input * price.in + t.cacheCreation * (price.cacheWrite ?? price.in) + t.cacheRead * (price.cacheRead ?? price.in) + t.output * price.out) / 1e6;
 }

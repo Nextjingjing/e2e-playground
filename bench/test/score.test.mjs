@@ -31,3 +31,8 @@ test("cost from tokens at OpenRouter prices", () => {
   const usd = runCost({ input: 1000, cacheCreation: 0, cacheRead: 0, output: 1000 }, { in: 2, out: 10, cacheRead: 0.5 });
   assert.ok(Math.abs(usd - 0.012) < 1e-9);
 });
+
+test("cache writes and reads are priced separately", () => {
+  const usd = runCost({ input: 0, cacheCreation: 1e6, cacheRead: 1e6, output: 0 }, { in: 2, out: 10, cacheWrite: 2.5, cacheRead: 0.1 });
+  assert.ok(Math.abs(usd - 2.6) < 1e-9);
+});

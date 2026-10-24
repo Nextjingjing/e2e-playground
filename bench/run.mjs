@@ -13,7 +13,8 @@ import { scoreRun, scoreCase, runCost } from "./lib/score.mjs";
 import { claudeEnv, openrouterUsage } from "./lib/openrouter.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const PRICES = { "openai/gpt-6.1-sol": { in: 2, out: 10, cacheRead: 2 } };  // USD / 1M tokens (OpenRouter list)
+// USD / 1M tokens, from OpenRouter's /api/v1/models pricing (prompt, completion, input_cache_write, input_cache_read)
+const PRICES = { "openai/gpt-6.1-sol": { in: 2, out: 10, cacheWrite: 2.5, cacheRead: 0.1 } };
 
 function loadCases(root, skill, { tag, caseName } = {}) {
   const dir = path.join(root, skill, "cases");
