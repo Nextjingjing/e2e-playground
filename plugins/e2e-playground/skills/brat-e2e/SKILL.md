@@ -27,7 +27,9 @@ something else:
 | Mobile | Maestro CLI flows (Apache-2.0); not Maestro Cloud (paid) |
 | HTTP API | Playwright `request` fixture or pytest + requests |
 
-Examples for each are in `references/surfaces.md`. The rules in sections 4–5
+Examples for each are in `references/surfaces.md`. Login reuse, fixtures, page objects,
+waiting on background work, contract drift of stubs, accessibility, tags, sharding and flaky
+tests on CI: look the situation up in `references/patterns.md`. The rules in sections 4–5
 were written for Playwright but carry over: find things the way a user would (visible text,
 control titles), wait for conditions instead of sleeping, isolate each test, run the real
 stack on a test database you own (never production or a shared one), stub only what you don't
