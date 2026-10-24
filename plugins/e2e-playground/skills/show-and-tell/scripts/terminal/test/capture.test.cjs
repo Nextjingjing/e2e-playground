@@ -80,6 +80,59 @@ test("fails when output never settles after expect matched", { skip: !win, timeo
   assert.ok(Date.now() - t0 < 20000, "took too long");
 });
 
+test("a secret in a window title (OSC) is refused too", { skip: !win, timeout: 60000 }, async () => {
+  const dir = tmp(), out = path.join(dir, "t.cast");
+  await assert.rejects(
+    capture({ shell: "powershell", cwd: dir, out, env: { PT_TOKEN: "s3cr3t-XYZ-123" } },
+      [{ type: "$Host.UI.RawUI.WindowTitle = $env:PT_TOKEN" }]),
+    /secret/);
+  assert.equal(fs.existsSync(out), false);
+});
+
+test("a failing step's error does not print the secret", { skip: !win, timeout: 60000 }, async () => {
+  const dir = tmp(), out = path.join(dir, "t.cast");
+  await assert.rejects(
+    capture({ shell: "powershell", cwd: dir, out, timeoutMs: 3000, env: { PT_TOKEN: "s3cr3t-XYZ-123" } },
+      [{ type: "echo $env:PT_TOKEN", expect: /never/ }]),
+    err => /step 1/.test(err.message) && !err.message.includes("s3cr3t-XYZ-123"));
+});
+
+test("refusal names the env var whose value showed", { skip: !win, timeout: 60000 }, async () => {
+  const dir = tmp(), out = path.join(dir, "t.cast");
+  await assert.rejects(
+    capture({ shell: "powershell", cwd: dir, out, env: { PT_SHOWN: "visible-value-42" } }, [{ type: "echo $env:PT_SHOWN" }]),
+    /PT_SHOWN/);
+});
+
+test("hidden secret whose env var is unset fails", { skip: !win, timeout: 60000 }, async () => {
+  const dir = tmp(), out = path.join(dir, "t.cast");
+  await assert.rejects(
+    capture({ shell: "powershell", cwd: dir, out }, [{ secret: "PT_UNSET_XYZ", hidden: true }, { type: "'x'" }]),
+    /PT_UNSET_XYZ/);
+});
+
+test("capture leaves no trace in PowerShell history", { skip: !win, timeout: 60000 }, async () => {
+  const dir = tmp(), out = path.join(dir, "t.cast"), tag = "pt-history-" + Date.now();
+  await capture({ shell: "powershell", cwd: dir, out }, [{ type: `'${tag}'` }]);
+  const hist = path.join(process.env.APPDATA, "Microsoft", "Windows", "PowerShell", "PSReadLine", "ConsoleHost_history.txt");
+  assert.ok(!fs.existsSync(hist) || !fs.readFileSync(hist, "utf8").includes(tag), "command was saved to history");
+});
+
+test("cmd hidden set keeps the exact value", { skip: !win, timeout: 60000 }, async () => {
+  const dir = tmp(), out = path.join(dir, "t.cast");
+  await capture({ shell: "cmd", cwd: dir, out }, [{ type: "set PT_V=abc", hidden: true }, { type: "echo [%PT_V%]" }]);
+  const { events } = readCast(out);
+  assert.match(afterStart(events), /\[abc\]/);
+});
+
+test("a failing command anywhere in a hidden PowerShell line fails capture", { skip: !win, timeout: 60000 }, async () => {
+  const dir = tmp(), out = path.join(dir, "t.cast");
+  await assert.rejects(
+    capture({ shell: "powershell", cwd: dir, out, timeoutMs: 5000 },
+      [{ type: "cd C:\\no-such-dir-xyz; $env:PT_A = '1'", hidden: true }, { type: "'x'" }]),
+    /hidden step/);
+});
+
 test("hidden step failure fails capture", { skip: !win, timeout: 60000 }, async () => {
   const dir = tmp(), out = path.join(dir, "t.cast");
   await assert.rejects(

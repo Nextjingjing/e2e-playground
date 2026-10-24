@@ -46,6 +46,56 @@ test("prompt and Thai visible", { skip: !win, timeout: 120000 }, async () => {
   assert.match(text, new RegExp(thaiCells("น้ำดื่ม")));
 });
 
+// A hand-made cast: no shell needed, and the chunk timing is exactly what we want to test.
+function synthCast(dir, outputs) {
+  const file = path.join(dir, "synth.cast");
+  const header = { version: 2, width: 80, height: 10, paintext: { shell: "powershell", title: "Windows PowerShell" } };
+  const ev = [[0, "m", "start"], ...outputs.map(([t, s]) => [t, "o", s]), [outputs[outputs.length - 1][0], "m", "end"]];
+  fs.writeFileSync(file, [header, ...ev].map(x => JSON.stringify(x)).join("\n") + "\n");
+  return file;
+}
+
+test("next() resolves only after its last output is drawn", { timeout: 60000 }, async () => {
+  const dir = tmp();
+  const c = synthCast(dir, [[0.1, "PS C:\\> list\r\n"], [0.3, "first row\r\n"], [0.305, "LAST ROW\r\n"]]);
+  const s = await film({ cast: c, outDir: dir, name: "drawn" });
+  let rows;
+  try {
+    rows = await s.page.evaluate(async () => {
+      await window.paintext.next("end");
+      return document.querySelector(".xterm-rows").textContent;  // same evaluate: no free frame
+    });
+  } finally { await s.finish(); }
+  assert.match(rows, /LAST ROW/);
+});
+
+test("redaction covers names the replay rewrote (Thai sara am, spaces)", { timeout: 60000 }, async () => {
+  const dir = tmp();
+  const c = synthCast(dir, [[0.1, "customer: คำแก้ว ใจดี\r\n"], [0.2, "owner: Jane Doe\r\n"]]);
+  const s = await film({ cast: c, outDir: dir, name: "redact", redact: { text: ["คำแก้ว ใจดี", "Jane Doe"] } });
+  let covered;
+  try {
+    await s.play();
+    covered = await s.page.evaluate(() => {
+      const bars = [...document.querySelectorAll("#__demo_redact > div, #__paintext_redact > div")].map(d => d.getBoundingClientRect());
+      return [...document.querySelectorAll(".xterm-rows > div")].slice(0, 2).map(row => {
+        const r = row.getBoundingClientRect();
+        return bars.some(b => b.top < r.bottom && b.bottom > r.top && b.width > 40);
+      });
+    });
+  } finally { await s.finish(); }
+  assert.deepEqual(covered, [true, true], "each name row needs a bar over it");
+});
+
+test("a failing film() does not leave the browser running", { timeout: 60000 }, () => {
+  const dir = tmp(), bad = path.join(dir, "bad.cast");
+  fs.writeFileSync(bad, JSON.stringify({ version: 2, width: 80, height: 10 }) + "\nnot json\n");
+  const script = `require(${JSON.stringify(path.join(__dirname, "..", "film.cjs"))}).film({ cast: ${JSON.stringify(bad)}, outDir: ${JSON.stringify(dir)}, name: "bad" }).then(() => process.exit(3), () => {});`;
+  const r = require("child_process").spawnSync(process.execPath, ["-e", script], { timeout: 40000 });
+  assert.notEqual(r.error && r.error.code, "ETIMEDOUT", "node hung: browser left open");
+  assert.equal(r.status, 0);
+});
+
 test("highlightText in a terminal points at the latest match", { skip: !win, timeout: 120000 }, async () => {
   const s = await film({ cast, outDir: tmp(), name: "latest" });
   let hlTop, rowTop;

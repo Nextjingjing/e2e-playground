@@ -192,9 +192,11 @@ async function startSession(opts) {
   if (opts.electron) return startElectron(pw, opts, view, font);
   const { chromium } = pw;
   const browser = await chromium.launch({ args: ["--force-device-scale-factor=1"] });
+  // a step that throws must not leave Chromium running: Node would never exit
+  const guard = async fn => { try { return await fn(); } catch (e) { await browser.close().catch(() => {}); throw e; } };
 
   let storageState;
-  if (login) {
+  if (login) await guard(async () => {
     storageState = opts.storageStatePath || path.join(outDir, "_auth-state.json");
     const fresh = fs.existsSync(storageState) && Date.now() - fs.statSync(storageState).mtimeMs < 4 * 3600e3;
     if (!fresh) {
@@ -204,7 +206,7 @@ async function startSession(opts) {
       await ctx.storageState({ path: storageState });
       await ctx.close();
     }
-  }
+  });
 
   const rawDir = path.join(outDir, "_raw", name);
   const context = await browser.newContext({
@@ -227,14 +229,16 @@ async function startSession(opts) {
   const shots = [];
   const demo = makeDemo(page, marks, t0, { view, font, theme: opts.theme, shots, shotDir: path.join(outDir, "shots", name) });
 
-  if (startUrl) {
-    await demo.waitApp(async () => {
-      await page.goto(startUrl);
-      await page.waitForLoadState("networkidle").catch(() => {});
-    }, "open start page");
-  }
-  await page.evaluate(() => document.fonts.ready).catch(() => {});
-  if (opts.beforeStart) await opts.beforeStart(page); // e.g. load a terminal replay; trimmed off with the page load
+  await guard(async () => {
+    if (startUrl) {
+      await demo.waitApp(async () => {
+        await page.goto(startUrl);
+        await page.waitForLoadState("networkidle").catch(() => {});
+      }, "open start page");
+    }
+    await page.evaluate(() => document.fonts.ready).catch(() => {});
+    if (opts.beforeStart) await opts.beforeStart(page); // e.g. load a terminal replay; trimmed off with the page load
+  });
   demo.mark("start", "start"); // post.py trims everything before this
 
   async function finish() {

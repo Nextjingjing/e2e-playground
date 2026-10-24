@@ -10,7 +10,8 @@ const campbell = {
 module.exports = {
   powershell: {
     file: "powershell.exe",
-    args: ["-NoLogo"],
+    // no profile (custom prompts, slow modules), and nothing typed lands in the user's history file
+    args: ["-NoLogo", "-NoProfile", "-NoExit", "-Command", "Set-PSReadLineOption -HistorySaveStyle SaveNothing"],
     prompt: /PS [^\r\n]*> ?$/,
     clear: "Clear-Host",
     prelude: ["[Console]::OutputEncoding=[Text.Encoding]::UTF8; $OutputEncoding=[Text.Encoding]::UTF8"],
@@ -31,6 +32,7 @@ module.exports = {
   bash: {
     file: process.platform === "win32" ? "C:\\Program Files\\Git\\bin\\bash.exe" : "bash",
     args: ["--login", "-i"],
+    env: { HISTFILE: "" },  // keep the demo out of ~/.bash_history
     prompt: /\$ ?$/,
     clear: "clear",
     prelude: ["export LANG=C.UTF-8"],

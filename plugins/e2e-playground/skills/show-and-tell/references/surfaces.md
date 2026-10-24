@@ -69,12 +69,16 @@ await capture({ shell: "powershell", cwd: "C:\\demo", out: "<work>/cases/01/01.c
 
 // 2. film: replay as a demo-kit session
 const { film } = require("<skill>/scripts/terminal/film.cjs");
-const s = await film({ cast: "<work>/cases/01/01.cast", outDir, name: "01-case" });
-await s.demo.caption("Add the order, answer y");
-await s.play("proof");                                     // plays until the "proof" step is done
-await s.demo.highlightText("A-042", "The new row, read back from the DB");
-await s.play();                                            // to the end
-await s.finish();                                          // 01-case.webm + 01-case.marks.json → post.py as usual
+const s = await film({ cast: "<work>/cases/01/01.cast", outDir, name: "01-case",
+                      redact: { text: ["<customer name on screen>"] } });   // optional, on top of the built-ins
+try {
+  await s.demo.caption("Add the order, answer y");
+  await s.play("proof");                                   // plays until the "proof" step is done
+  await s.demo.highlightText("A-042", "The new row, read back from the DB");
+  await s.play();                                          // to the end
+} finally {
+  await s.finish();                                        // always: an open browser keeps Node running
+}                                                          // 01-case.webm + 01-case.marks.json → post.py as usual
 ```
 
 Steps: `{ type, expect, hidden, mark, enter = true }` or `{ secret: "ENV_NAME" }`. `expect`
@@ -95,7 +99,12 @@ Rules:
   cutting the capture. The replay shows exactly what the shell printed.
 - `highlightText` in a terminal picks the **lowest** match on screen (the newest output, not
   the typed command). Pass a RegExp or `{ line: true }` when you need something else.
-- `.cast` files stay in the work folder; they are not deliverables.
+- `.cast` files stay in the work folder; they are not deliverables. Hidden commands and their
+  output are kept in the `.cast` word for word (only secret inputs become placeholders).
+- PowerShell starts with `-NoProfile`, and nothing is saved to PSReadLine history (bash:
+  `HISTFILE` empty). A custom prompt from your profile won't show up in the video.
+- Redaction in the replay works on whole rows, so names written in Thai or split by colours
+  are still covered.
 - Waits over 0.8 s become idle spans: post.py squeezes them like spinners on the web.
 - Thai: works in PowerShell and cmd (the capture sets UTF-8 itself). The replay draws ำ after
   a tone mark as ํ + tone + า, because xterm.js loses the circle otherwise. `highlightText("น้ำ")`

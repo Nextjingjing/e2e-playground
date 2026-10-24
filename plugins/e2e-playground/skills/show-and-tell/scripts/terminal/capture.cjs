@@ -31,11 +31,12 @@ const strip = s => s.replace(ANSI, "");
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 // Credentials only: personal data (emails, phone numbers, ids) is covered on screen by redact.cjs when filming.
 const CREDENTIALS = DEFAULT_PATTERNS.filter(p => !["email", "thai national id", "phone", "card number", "long id"].includes(p.name));
-// Hidden commands are not shown, so they may be wrapped: a failing one ends the shell and so the capture.
+// Hidden commands are not shown, so they may be wrapped: any failing command in the line ends the
+// shell and so the capture. (cmd: the parentheses keep `set A=x` from taking the trailing space.)
 const GUARD = {
-  powershell: c => `${c}; if (-not $?) { exit 97 }`,
-  cmd: c => `${c} || exit 97`,
-  bash: c => `${c} || exit 97`,
+  powershell: c => `$global:LASTEXITCODE = 0; try { $ErrorActionPreference = 'Stop'; ${c} } catch { exit 97 } finally { $ErrorActionPreference = 'Continue' }; if ($LASTEXITCODE) { exit 97 }`,
+  cmd: c => `(${c}) || exit 97`,
+  bash: c => `set -e; ${c}; set +e`,
 };
 
 async function capture(opts, steps) {
@@ -45,7 +46,12 @@ async function capture(opts, steps) {
   const { cwd = process.cwd(), out, cols = 110, rows = 30, env = {}, typeMs = 60, timeoutMs = 20000, settleMs = 300 } = opts;
   if (!out) throw new Error("capture: opts.out (.cast path) is required");
 
-  const p = pty.spawn(th.file, th.args, { name: "xterm-256color", cols, rows, cwd, env: { ...process.env, ...env }, useConpty: true });
+  // [name, value] of everything that must never show: opts.env and the env vars of secret steps
+  const secrets = [...Object.entries(env), ...steps.filter(s => s.secret).map(s => [s.secret, process.env[s.secret]])]
+    .filter(([, v]) => v && String(v).length >= 4);
+  for (const s of steps) if (s.secret && !(s.secret in process.env)) throw new Error(`capture: env var ${s.secret} (a secret step) is not set`);
+
+  const p = pty.spawn(th.file, th.args, { name: "xterm-256color", cols, rows, cwd, env: { ...process.env, ...th.env, ...env }, useConpty: true });
   const kill = () => { try { p.kill(); } catch {} };
   process.once("exit", kill);
   const t0 = Date.now(), events = [];
@@ -62,7 +68,7 @@ async function capture(opts, steps) {
   const screenTail = () => {
     const b = screen.buffer.active, lines = [];
     for (let i = 0; i < b.length; i++) lines.push(b.getLine(i).translateToString(true));
-    return lines.filter(l => l.trim()).slice(-10).join("\n");
+    return mask(lines.filter(l => l.trim()).slice(-10).join("\n"), secrets);  // errors end up in logs and notes
   };
   const atPrompt = () => th.prompt.test(since) || th.prompt.test(since.slice(-400).replace(/\r?\n/g, ""));
   async function wait(what, re) {
@@ -94,7 +100,7 @@ async function capture(opts, steps) {
     for (const c of th.prelude) { await typeLine(c, { fast: true }); await wait("UTF-8 prelude"); }
     for (const [i, s] of hidden.entries()) {
       const what = `hidden step ${i + 1} (${s.type ?? "‹env:" + s.secret + "›"})`;
-      if (s.secret) await typeLine(process.env[s.secret] || "", { enter: s.enter ?? true, shown: `‹env:${s.secret}›`, fast: true });
+      if (s.secret) await typeLine(process.env[s.secret], { enter: s.enter ?? true, shown: `‹env:${s.secret}›`, fast: true });
       else await typeLine(GUARD[shell](s.type), { enter: s.enter ?? true, shown: s.type, fast: true });
       await wait(what, s.expect);
     }
@@ -102,10 +108,8 @@ async function capture(opts, steps) {
     events.push([now(), "m", "start"]);
     for (const [i, s] of shown.entries()) {
       const n = i + 1;
-      if (s.secret) {
-        if (!(s.secret in process.env)) throw new Error(`step ${n}: env var ${s.secret} is not set`);
-        await typeLine(process.env[s.secret], { enter: s.enter ?? true, shown: `‹env:${s.secret}›` });
-      } else await typeLine(s.type, { enter: s.enter ?? true });
+      if (s.secret) await typeLine(process.env[s.secret], { enter: s.enter ?? true, shown: `‹env:${s.secret}›` });
+      else await typeLine(s.type, { enter: s.enter ?? true });
       await wait(`step ${n} (${s.type ?? "‹env:" + s.secret + "›"})`, s.expect);
       events.push([now(), "m", `step:${n}`]);
       if (s.mark) events.push([now(), "m", s.mark]);
@@ -115,7 +119,7 @@ async function capture(opts, steps) {
     const header = { version: 2, width: cols, height: rows, timestamp: Math.floor(t0 / 1000),
       env: { SHELL: shell, TERM: "xterm-256color" }, paintext: { shell, title: th.title } };
     const text = events.map(e => JSON.stringify(e)).join("\n");
-    checkSecrets(events, [...Object.values(env), ...steps.filter(s => s.secret).map(s => process.env[s.secret])]);
+    checkSecrets(events, secrets);
     fs.mkdirSync(path.dirname(path.resolve(out)), { recursive: true });
     fs.writeFileSync(out, JSON.stringify(header) + "\n" + text + "\n");
     p.write("exit\r");
@@ -127,19 +131,27 @@ async function capture(opts, steps) {
   }
 }
 
-function checkSecrets(events, values) {
-  const output = strip(events.filter(e => e[1] === "o").map(e => e[2]).join(""));  // the stream as the terminal got it
-  const inputs = events.filter(e => e[1] === "i").map(e => e[2]).join("\n");
-  for (const v of values) {
-    if (v && String(v).length >= 4 && (output.includes(String(v)) || inputs.includes(String(v))))
-      throw new Error("capture refused: the terminal showed a secret value (an env var used in this capture). Don't print it on screen.");
+const masked = m => /^[*•●]+$/.test(m.split(/[:=\s]+/).pop());  // "Password: ****" is the shell hiding it
+const credentialHits = text => CREDENTIALS.flatMap(p =>
+  [...text.matchAll(new RegExp(p.src, p.flags.includes("g") ? p.flags : p.flags + "g"))]
+    .filter(m => !masked(m[0])).map(m => ({ name: p.name, text: m[0] })));
+
+function mask(text, secrets) {
+  for (const [name, v] of secrets) text = text.split(String(v)).join(`‹env:${name}›`);
+  for (const h of credentialHits(text)) text = text.split(h.text).join(`‹${h.name}›`);
+  return text;
+}
+
+function checkSecrets(events, secrets) {
+  const raw = events.filter(e => e[1] === "o").map(e => e[2]).join("");
+  // stripped: the text as shown; raw: also window titles and link targets (OSC), which the tab shows
+  const texts = [strip(raw), raw, events.filter(e => e[1] === "i").map(e => e[2]).join("\n")];
+  for (const [name, v] of secrets) {
+    if (texts.some(t => t.includes(String(v))))
+      throw new Error(`capture refused: the terminal showed the value of ${name} (a secret or opts.env value). Don't print it on screen; pass non-secret settings in hidden steps instead of opts.env.`);
   }
-  const masked = m => /^[*•●]+$/.test(m.split(/[:=\s]+/).pop());  // "Password: ****" is the shell hiding it
-  for (const p of CREDENTIALS) {
-    const re = new RegExp(p.src, p.flags.includes("g") ? p.flags : p.flags + "g");
-    if ([...output.matchAll(re)].some(m => !masked(m[0])))
-      throw new Error(`capture refused: the output looks like it holds a secret (${p.name}). Keep it off screen.`);
-  }
+  const hit = credentialHits(texts[0])[0] || credentialHits(texts[1])[0];
+  if (hit) throw new Error(`capture refused: the output looks like it holds a secret (${hit.name}). Keep it off screen.`);
 }
 
 module.exports = { capture, strip };

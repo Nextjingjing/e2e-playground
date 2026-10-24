@@ -28,8 +28,11 @@ const IDLE_GAP = 0.8;  // seconds without output that film.cjs turns into an idl
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let term, events = [], i = 0, lastT = 0, stream;
 const write = s => new Promise(r => term.write(s, r));
+// term.write resolves once the bytes are parsed; the DOM renderer paints on a later frame.
+// Anything that looks at the screen next (highlightText, redaction, a shot) must see the paint.
+const painted = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
-async function load({ cast, theme, title, icon, font }) {
+async function load({ cast, theme, title, icon, font, redact }) {
   const [head, ...lines] = cast.trim().split("\n");
   const h = JSON.parse(head);
   events = lines.map(l => JSON.parse(l));
@@ -43,6 +46,7 @@ async function load({ cast, theme, title, icon, font }) {
     fontFamily: font || "'Cascadia Mono','Consolas','Leelawadee UI','Noto Sans Mono','Noto Sans Thai',monospace" });
   term.onTitleChange(t => { titleEl.textContent = t || title; });
   term.open(box);
+  if (redact && redact.length) redactRows(redact);  // before the first byte is drawn
   // largest font size whose cols x rows grid still fits the window
   for (let size = 26; size >= 10; size--) {
     term.options.fontSize = size;
@@ -56,26 +60,61 @@ async function load({ cast, theme, title, icon, font }) {
   for (; i <= start; i++) if (events[i][1] === "o") await write(stream.push(events[i][2]));
   lastT = start >= 0 ? events[start][0] : 0;
   await write(stream.flush());
+  await painted();
 }
 
 // Play at recorded speed until: a gap longer than IDLE_GAP (returned, not slept: film.cjs waits it out
 // as idle time), the marker `stop`, or the end.
 async function next(stop) {
+  const pause = async r => { await write(stream.flush()); await painted(); return r; };
   for (; i < events.length; i++) {
     const [t, kind, data] = events[i];
-    if (kind === "m") { if (data === stop) { i++; await write(stream.flush()); return { marker: data, done: false }; } continue; }
+    if (kind === "m") { if (data === stop) { i++; return pause({ marker: data, done: false }); } continue; }
     if (kind !== "o") continue;
     const gap = t - lastT;
-    if (gap > IDLE_GAP) { lastT = t; await write(stream.flush()); return { gap, done: false }; }
+    if (gap > IDLE_GAP) { lastT = t; return pause({ gap, done: false }); }
     if (gap > 0) await sleep(gap * 1000);
     lastT = t;
     await write(stream.push(data));
   }
-  await write(stream.flush());
-  return { done: true };
+  return pause({ done: true });
 }
 
-window.paintext = { load, next };
+// Redaction per terminal row. xterm.js splits a row into many spans (one per Thai cell, one per
+// colour run), so redact.cjs, which matches inside single text nodes, cannot see a name across
+// them. Same idea, whole rows: a MutationObserver redraws solid bars before the frame is painted.
+function redactRows(patterns) {
+  const res = patterns.map(p => new RegExp(p.src, p.flags.includes("g") ? p.flags : p.flags + "g"));
+  const layer = document.createElement("div");
+  layer.id = "__paintext_redact";
+  Object.assign(layer.style, { position: "fixed", inset: "0", pointerEvents: "none", zIndex: 2147483646 });
+  document.body.appendChild(layer);
+  const rowsEl = document.querySelector(".xterm-rows");
+  const draw = () => {
+    layer.textContent = "";
+    for (const row of rowsEl.children) {
+      const nodes = [], w = document.createTreeWalker(row, NodeFilter.SHOW_TEXT);
+      for (let n; (n = w.nextNode());) nodes.push(n);
+      const text = nodes.map(n => n.nodeValue).join("").replace(/ /g, " ");
+      const at = pos => { let acc = 0; for (const n of nodes) { if (pos <= acc + n.nodeValue.length) return [n, pos - acc]; acc += n.nodeValue.length; } };
+      for (const re of res) for (const m of text.matchAll(re)) {
+        if (!m[0]) continue;
+        const r = document.createRange();
+        r.setStart(...at(m.index)); r.setEnd(...at(m.index + m[0].length));
+        for (const b of r.getClientRects()) {
+          const d = document.createElement("div");
+          Object.assign(d.style, { position: "fixed", left: b.left - 3 + "px", top: b.top - 2 + "px", width: b.width + 6 + "px",
+            height: b.height + 4 + "px", background: "#2b2b2b", borderRadius: "3px" });
+          layer.appendChild(d);
+        }
+      }
+    }
+  };
+  new MutationObserver(draw).observe(rowsEl, { childList: true, subtree: true, characterData: true });
+  draw();
+}
+
+window.paintext = { load, next, redactRows };
 </script>
 </body>
 </html>
