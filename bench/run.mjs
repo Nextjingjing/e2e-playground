@@ -68,6 +68,9 @@ export async function runSuite(o) {
     const score = scoreRun(grades);
     slot.push({ i, attempts, score, grades, tokens: run.tokens, turns: run.turns, durationMs: run.durationMs,
       isError: run.isError, error: run.error, final: run.final, tools: run.toolUses.map(t => t.name),
+      // kept short so tool graders can be re-scored later (regrade.mjs) without bloating the file
+      toolUses: run.toolUses.map(t => ({ name: t.name, input: Object.fromEntries(Object.entries(t.input || {})
+        .map(([k, v]) => [k, (typeof v === "string" ? v : JSON.stringify(v)).slice(0, 200)])) })),
       costUsd: runCost(run.tokens, PRICES[model] || PRICES["openai/gpt-6.1-sol"]) });
     if (!o.keep) fs.rmSync(run.workspace, { recursive: true, force: true });
     if (!o.quiet) console.log(`${c.name} [${arm} #${i + 1}] score ${score.toFixed(2)}${run.isError ? " ERROR " + run.error : ""}`);

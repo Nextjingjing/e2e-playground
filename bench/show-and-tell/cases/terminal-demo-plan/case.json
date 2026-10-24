@@ -1,28 +1,14 @@
 {
   "name": "terminal-demo-plan",
-  "tags": [
-    "show-and-tell",
-    "cheap"
-  ],
+  "tags": ["show-and-tell", "cheap"],
   "fixture": "orders-cli",
   "prompt": "make a demo video of importing orders.csv with the cli so the team sees it works. Plan only for now: tell me how you would do it, don't record or create files yet.",
   "graders": [
-    {
-      "name": "skill fired",
-      "type": "skill_used",
-      "skill": "show-and-tell",
-      "withOnly": true
-    },
-    {
-      "name": "real run, shell chosen",
-      "type": "judge",
-      "criteria": "PASS if the plan runs the real CLI command (including answering the [y/N] prompt) and turns that real run into the video, and either asks the user which shell or terminal the video should show (PowerShell, cmd, bash...) or says it will use PowerShell because the team uses it. FAIL if it types fake output, edits the result, or skips the confirmation prompt."
-    },
-    {
-      "name": "shows the result",
-      "type": "final_regex",
-      "pattern": "list|imported|result|orders table",
-      "flags": "i"
-    }
+    { "name": "skill fired", "type": "skill_used", "skill": "show-and-tell", "withOnly": true },
+    { "name": "nothing faked", "type": "judge", "criteria": "PASS if the plan uses the real output of really running the CLI. FAIL if it types or draws made-up output, edits the result, or inserts rows into the database by hand." },
+    { "name": "answers the [y/N] prompt", "type": "final_regex", "pattern": "\\[y/N\\]|type `?y`?|answer(s|ing)? (it )?(with )?`?y|confirm(ation)? prompt", "flags": "i" },
+    { "name": "shell chosen or asked", "type": "final_regex", "pattern": "powershell|which (shell|terminal)|cmd\\b|git bash", "flags": "i" },
+    { "name": "shows the result", "type": "final_regex", "pattern": "orders\\.py list|imported \\d|imported 3|read ?back|orders table", "flags": "i" },
+    { "name": "isolates the data", "type": "final_regex", "pattern": "isolated|throwaway|temp(orary)? (folder|dir|copy)|back ?up|copy of|fresh (db|database)|separate (db|database|folder)", "flags": "i" }
   ]
 }

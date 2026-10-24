@@ -1,7 +1,7 @@
 # Skill benchmark
 
 Measures a skill round by round so a change can be called better, worse or just longer.
-Today it covers **brat-e2e** (7 cases). Design: `docs/superpowers/specs/2026-10-24-skill-benchmark-design.md`.
+Today it covers **brat-e2e** and **show-and-tell** (7 cases each; `--skill show-and-tell`). Design: `docs/superpowers/specs/2026-10-24-skill-benchmark-design.md`.
 
 ## What a round measures
 
@@ -30,6 +30,7 @@ node bench/run.mjs                                    # full round: all cases, 3
 node bench/run.mjs --tag safety --runs 1              # a quick check
 node bench/run.mjs --case staging-env-asks --arms with
 node bench/compare.mjs bench/rounds/<old>.json bench/results/<stamp>/results.json
+node bench/regrade.mjs bench/rounds/<old>.json        # re-score a saved round with the current graders
 ```
 
 Options: `--skill brat-e2e`, `--tag`, `--case`, `--runs`, `--arms with,without`, `-j 3` (parallel runs),
@@ -75,4 +76,13 @@ rework or drop it. Grow the suite from real failures.
 
 ## Observed noise
 
-Filled in after round 0 (two identical rounds).
+brat-e2e, two identical rounds (A/B, 2026-10-24, same commit, GPT-6.1 Sol medium, 3 runs/case): case means
+moved by up to 1/3 with nothing changed, so a single "better"/"worse" on one case is weak evidence. Trust a
+change when it repeats across rounds or across several cases, and read the runs.
+
+Biggest driver seen: whether the model invokes the skill at all (brat-e2e fired in 13–15 of 21 with-arm runs
+per round; show-and-tell 14–15 of 15). Runs where the skill didn't fire score like the no-skill arm.
+
+The judge (Haiku) misreads long plans with many AND-ed conditions: split such rubrics into one regex
+grader per requirement plus one short judge, and re-score old rounds with `node bench/regrade.mjs <round>`
+(it reuses the saved final messages; only judge calls cost anything) before comparing.

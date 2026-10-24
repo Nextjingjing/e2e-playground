@@ -1,0 +1,1825 @@
+{
+  "round": {
+    "date": "2026-10-24T06:37:52.399Z",
+    "commit": "1598180",
+    "skill": "show-and-tell",
+    "model": "openai/gpt-6.1-sol",
+    "judge": "anthropic/claude-haiku-5.5",
+    "effort": "medium",
+    "arms": [
+      "with",
+      "without"
+    ],
+    "skillWords": 2904,
+    "descriptionWords": 125,
+    "spendUsd": 2.043774925000001,
+    "note": "web-demo-plan re-run with split graders"
+  },
+  "cases": [
+    {
+      "name": "fires-bug-for-qa",
+      "tags": [
+        "show-and-tell",
+        "cheap",
+        "trigger"
+      ],
+      "arms": {
+        "with": {
+          "runs": [
+            {
+              "i": 0,
+              "attempts": 1,
+              "score": 0.5,
+              "grades": [
+                {
+                  "name": "skill fired",
+                  "type": "skill_used",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": false,
+                  "detail": "show-and-tell invoked 0x"
+                },
+                {
+                  "name": "no files written",
+                  "type": "tool_used",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "Write called 0x (expected 0..0)"
+                }
+              ],
+              "tokens": {
+                "input": 6,
+                "cacheCreation": 16982,
+                "cacheRead": 10019,
+                "output": 510
+              },
+              "turns": 3,
+              "durationMs": 17538,
+              "isError": false,
+              "error": "",
+              "final": "I’d capture **the actual UI action and the resulting stock ledger**, so QA can see whether two quick clicks really cause two movements—not just two requests.\n\n1. **Use an isolated test environment.** Run the app and its real backend against a disposable, seeded database with a demo user and known stock. No production or shared stock data. Mocked responses wouldn’t count as proof of this bug.\n\n2. **Establish the baseline.** Show the selected item/pallet, its quantity, current location, and existing movement history. First verify that a single click produces exactly one expected movement.\n\n3. **Record the reproduction with Playwright + Chromium.** Capture video while sending two normal clicks on **Send to Sorting** with a short, measured gap. Keep the real button behaviour intact—no forced clicks, removing disabled states, or calling the endpoint directly.\n\n4. **Collect supporting evidence.** Timestamp the clicks and matching requests/responses, then inspect the persisted movement records and stock balance. Two requests alone aren’t proof: the evidence must show **two committed stock movements for the same intended transfer**.\n\n5. **If it doesn’t reproduce immediately, vary timing transparently.** Reset the fixture between attempts and try a bounded range of click intervals. If controlled latency is needed, label that condition explicitly. Don’t fabricate the outcome or present a failure to reproduce as success.\n\n6. **Package the successful attempt for QA.** Provide a short video showing **before → rapid clicks → duplicate movements**, plus exact reproduction steps, app revision, timing/environment conditions, and sanitized request/ledger evidence. Review the recording for readable results and exposed credentials or personal data before sharing.\n\nBefore execution, I’d confirm the isolated environment/demo-data reset method and the output folder with you. **I haven’t started the app, recorded anything, changed stock, or created files.**",
+              "tools": [
+                "Skill"
+              ],
+              "costUsd": 0.0485689
+            },
+            {
+              "i": 1,
+              "attempts": 1,
+              "score": 1,
+              "grades": [
+                {
+                  "name": "skill fired",
+                  "type": "skill_used",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "show-and-tell invoked 1x"
+                },
+                {
+                  "name": "no files written",
+                  "type": "tool_used",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "Write called 0x (expected 0..0)"
+                }
+              ],
+              "tokens": {
+                "input": 9,
+                "cacheCreation": 21734,
+                "cacheRead": 24679,
+                "output": 575
+              },
+              "turns": 5,
+              "durationMs": 21474,
+              "isError": false,
+              "error": "",
+              "final": "I’d capture a **real reproduction with before-and-after stock evidence**, not just two clicks followed by a success toast.\n\n1. **Prepare a safe environment.** Identify the app’s startup steps and use an isolated test database with the real backend—not production or a shared database. Back it up before testing. Use one disposable pallet/item with known stock and movement history; log in off camera with a test account.\n\n2. **Establish the baseline.** Show the item, starting quantity/location, and existing movement history. Run a single-click control on separate equivalent test data to establish the expected one-movement result.\n\n3. **Reproduce through actual mouse input.** Use Playwright’s Chromium with a visible cursor and click indicators. Click **Send to Sorting** twice rapidly using real mouse events, recording the actual interval. Keep this moment at normal speed—no artificial pauses between clicks, injected JavaScript clicks, mocked responses, or changes to button behaviour.\n\n4. **Prove the duplicate persisted.** After processing finishes, refresh the relevant screen and show the resulting stock and movement history. Cross-check with read-only database queries and available request logs: **did the same item get two committed movements from that one rapid-double-click attempt?** Two requests or two toasts alone wouldn’t prove it.\n\n5. **If it doesn’t reproduce, report that honestly.** Try a bounded set of click intervals with fresh test data per attempt. If controlled latency is needed, label that as a separate, latency-assisted reproduction—not an unmodified run. Never manufacture duplicate movement rows or force the result.\n\n6. **Package it for QA.** Deliver a short MP4 plus the original uncut recording and a reproduction note containing the build, environment, starting state, click interval, attempt count, and verified movement IDs. Keep the critical click/result sequence uncut, redact sensitive information, and check the final video for readable proof.\n\n**Before execution, I’d confirm the isolated test environment, permitted test-data setup, and output folder.** No recording, app execution, or file creation yet.",
+              "tools": [
+                "Skill",
+                "Skill"
+              ],
+              "costUsd": 0.0625709
+            },
+            {
+              "i": 2,
+              "attempts": 1,
+              "score": 1,
+              "grades": [
+                {
+                  "name": "skill fired",
+                  "type": "skill_used",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "show-and-tell invoked 1x"
+                },
+                {
+                  "name": "no files written",
+                  "type": "tool_used",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "Write called 0x (expected 0..0)"
+                }
+              ],
+              "tokens": {
+                "input": 9,
+                "cacheCreation": 21744,
+                "cacheRead": 24679,
+                "output": 636
+              },
+              "turns": 5,
+              "durationMs": 21412,
+              "isError": false,
+              "error": "",
+              "final": "I’d capture a **real UI reproduction with persisted stock evidence**, not just two clicks or two success messages.\n\n### Plan\n1. **Prepare an isolated environment.** Find the app’s startup steps and use a real local/test backend and disposable database—not production or a shared database. Use a demo account and one clearly identifiable test item/pallet. Back up the test database before any attempt; don’t restore without approval.\n\n2. **Establish the baseline.** Note the item’s quantity, location, and existing movement records. Define the expected result of one “Send to Sorting” action so a duplicate is unambiguous.\n\n3. **Rehearse without recording.** Use Playwright’s Chromium with real mouse input to click **Send to Sorting twice rapidly**, without waiting for the first request to finish. Measure the actual click/request spacing. Each attempt gets fresh test data because even a failed reproduction may move stock.\n   - Start with normal timing.\n   - If needed, try disclosed browser/network throttling to widen the race window.\n   - Don’t remove button protections, inject requests, mock responses, or manufacture movement rows.\n\n4. **Record the successful reproduction.** The short clip would show:\n   - **Before:** the test item and starting stock state.\n   - **Trigger:** two rapid clicks, with visible cursor/click indicators.\n   - **After:** refresh or reopen movement history to show the persisted duplicate and resulting stock change.\n\n   Keep the critical double-click sequence at **original speed, uncut**. Any slow-motion replay would be separate and labelled.\n\n5. **Verify the claim.** Correlate the recording with sanitized request timestamps and read-only database checks. Two requests alone aren’t proof: I’d confirm that this single attempt actually produced two movements and explain their effect on stock.\n\n6. **Package for QA.** Deliver an MP4, repeatable capture script, and concise reproduction notes: build, setup, test identifiers, click interval, any throttling, expected versus actual result, and evidence timestamps. Review for readability and exposed credentials/personal data before sharing.\n\n**If it won’t reproduce, I’ll report the attempts and observed behavior—not stage a successful result.**\n\nBefore execution, I’d confirm the isolated test environment and output folder with you. **No app actions, recording, or files have been created.**",
+              "tools": [
+                "Skill",
+                "Skill"
+              ],
+              "costUsd": 0.0632059
+            }
+          ],
+          "mean": 0.8333333333333334,
+          "passAll": false,
+          "infraErrors": 0
+        },
+        "without": {
+          "runs": [],
+          "mean": null,
+          "passAll": false,
+          "infraErrors": 0
+        }
+      },
+      "tokens": {
+        "with": {
+          "input": 24,
+          "cacheCreation": 60460,
+          "cacheRead": 59377,
+          "output": 1721
+        },
+        "without": {
+          "input": 0,
+          "cacheCreation": 0,
+          "cacheRead": 0,
+          "output": 0
+        }
+      },
+      "durationMs": {
+        "with": 20141,
+        "without": null
+      },
+      "costUsd": {
+        "with": 0.1743457,
+        "without": 0
+      },
+      "delta": null
+    },
+    {
+      "name": "fires-cli-gif",
+      "tags": [
+        "show-and-tell",
+        "cheap",
+        "trigger"
+      ],
+      "arms": {
+        "with": {
+          "runs": [
+            {
+              "i": 0,
+              "attempts": 1,
+              "score": 1,
+              "grades": [
+                {
+                  "name": "skill fired",
+                  "type": "skill_used",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "show-and-tell invoked 1x"
+                },
+                {
+                  "name": "no files written",
+                  "type": "tool_used",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "Write called 0x (expected 0..0)"
+                }
+              ],
+              "tokens": {
+                "input": 15,
+                "cacheCreation": 23630,
+                "cacheRead": 65800,
+                "output": 671
+              },
+              "turns": 8,
+              "durationMs": 24294,
+              "isError": false,
+              "error": "",
+              "final": "I’d make a **20–30 second terminal demo in PowerShell**, matching the README and showing the full confirmation—not just the success message.\n\n### Storyboard\n1. **Brief title:** “Import orders from CSV.”\n2. Type `python orders.py import orders.csv`.\n3. Hold on the three-row preview, with Thai product names readable.\n4. Pause at **`Import 3 orders? [y/N]`**, then visibly type `y` and press Enter.\n5. Show **`imported 3 orders`**.\n6. Type `python orders.py list` and hold on all three saved orders as proof.\n\n### How I’d produce it\n- Run the actual CLI in an isolated demo directory with copies of `orders.py` and `orders.csv`. Its SQLite database is relative to the working directory, so this keeps any existing `orders.db` untouched.\n- Capture real PowerShell input/output with the skill’s **paintext** recorder, then render that capture—no fabricated terminal output or database inserts.\n- Use a clean prompt without personal paths, large text, and a Thai-capable font. Keep the confirmation and final rows on screen long enough to read.\n- Export a silent MP4, plus a small GIF preview linking to it for the README. Proposed location: `docs/demo/`.\n- Verify the saved rows, review the prompt/result frames for readability and sensitive information, then add the README link.\n\n**Nothing has been run, recorded, or created; I’ve only read the existing files and recording guidance.**",
+              "tools": [
+                "Skill",
+                "Glob",
+                "Read",
+                "Read",
+                "Read",
+                "Read"
+              ],
+              "costUsd": 0.072395
+            },
+            {
+              "i": 1,
+              "attempts": 1,
+              "score": 1,
+              "grades": [
+                {
+                  "name": "skill fired",
+                  "type": "skill_used",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "show-and-tell invoked 1x"
+                },
+                {
+                  "name": "no files written",
+                  "type": "tool_used",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "Write called 0x (expected 0..0)"
+                }
+              ],
+              "tokens": {
+                "input": 18,
+                "cacheCreation": 20558,
+                "cacheRead": 79880,
+                "output": 636
+              },
+              "turns": 9,
+              "durationMs": 27048,
+              "isError": false,
+              "error": "",
+              "final": "I’d make a **20–30 second terminal clip in PowerShell**, matching the README’s Windows workflow.\n\n1. **Prepare a safe demo:** use the existing three-row `orders.csv` in an isolated working directory with a fresh SQLite database, leaving any existing `orders.db` untouched.\n2. **Record the real interaction:**\n   - Type `python orders.py import orders.csv`.\n   - Hold on the preview so the Thai product names are readable.\n   - Show **`Import 3 orders? [y/N]`**, pause, then visibly type `y` and press Enter—no piped confirmation.\n   - Show `imported 3 orders`.\n   - Run `python orders.py list` and hold on all three saved orders as proof.\n3. **Polish lightly:** readable font with Thai support, tight terminal framing, no music, and only trim idle time—not the prompt or confirmation.\n4. **Verify and present:** check that the prompt, typed answer, Thai text, and final rows remain legible. Produce an MP4 with a small GIF preview for the README linking to it; no external upload without approval.\n\nI’ve only read the project files. **Nothing has been run, recorded, or created.**",
+              "tools": [
+                "Skill",
+                "Glob",
+                "Glob",
+                "Read",
+                "Read",
+                "Read",
+                "Read"
+              ],
+              "costUsd": 0.065779
+            },
+            {
+              "i": 2,
+              "attempts": 1,
+              "score": 1,
+              "grades": [
+                {
+                  "name": "skill fired",
+                  "type": "skill_used",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "show-and-tell invoked 1x"
+                },
+                {
+                  "name": "no files written",
+                  "type": "tool_used",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "Write called 0x (expected 0..0)"
+                }
+              ],
+              "tokens": {
+                "input": 15,
+                "cacheCreation": 23383,
+                "cacheRead": 62692,
+                "output": 695
+              },
+              "turns": 8,
+              "durationMs": 26241,
+              "isError": false,
+              "error": "",
+              "final": "I’d make a **20–30 second PowerShell demo**, matching the README’s Windows workflow.\n\n1. **Prepare safely off camera:** use an isolated demo folder with the real `orders.py`, the supplied three-row CSV, and a fresh SQLite database—leaving any existing `orders.db` untouched.\n2. **Show the full interaction:**\n   ```text\n   python orders.py import orders.csv\n   ```\n   Hold on the preview, including the Thai product names, and the real **`Import 3 orders? [y/N]`** prompt. Pause briefly before typing `y`, then show `imported 3 orders`.\n3. **Prove persistence:** run `python orders.py list` and hold on all three saved orders for a few seconds.\n4. **Capture honestly:** record the real PowerShell session through a pseudo-terminal, then render its captured output with the demo kit. No fabricated output or mocked database results. Check that Thai text renders correctly.\n5. **Polish for the README:** a brief title, readable terminal text, minimal captions, and shortened dead time—but keep the confirmation prompt and response visible. Export MP4; propose a compact GIF preview linking to the video for README compatibility.\n6. **Verify before delivery:** check the key frames for readability and accidental personal information, and verify the isolated database contains the expected three rows.\n\nProposed deliverables: `docs/demo/csv-import.mp4`, a GIF preview, and a small README embed update.\n\n**Nothing has been run, recorded, or created.** I’d use PowerShell unless you prefer another shell.",
+              "tools": [
+                "Skill",
+                "Glob",
+                "Read",
+                "Read",
+                "Read",
+                "Read"
+              ],
+              "costUsd": 0.0717067
+            }
+          ],
+          "mean": 1,
+          "passAll": true,
+          "infraErrors": 0
+        },
+        "without": {
+          "runs": [],
+          "mean": null,
+          "passAll": false,
+          "infraErrors": 0
+        }
+      },
+      "tokens": {
+        "with": {
+          "input": 48,
+          "cacheCreation": 67571,
+          "cacheRead": 208372,
+          "output": 2002
+        },
+        "without": {
+          "input": 0,
+          "cacheCreation": 0,
+          "cacheRead": 0,
+          "output": 0
+        }
+      },
+      "durationMs": {
+        "with": 25861,
+        "without": null
+      },
+      "costUsd": {
+        "with": 0.20988070000000003,
+        "without": 0
+      },
+      "delta": null
+    },
+    {
+      "name": "fires-show-the-pm",
+      "tags": [
+        "show-and-tell",
+        "cheap",
+        "trigger"
+      ],
+      "arms": {
+        "with": {
+          "runs": [
+            {
+              "i": 0,
+              "attempts": 1,
+              "score": 1,
+              "grades": [
+                {
+                  "name": "skill fired",
+                  "type": "skill_used",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "show-and-tell invoked 1x"
+                },
+                {
+                  "name": "no files written",
+                  "type": "tool_used",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "Write called 0x (expected 0..0)"
+                }
+              ],
+              "tokens": {
+                "input": 24,
+                "cacheCreation": 21660,
+                "cacheRead": 120982,
+                "output": 1624
+              },
+              "turns": 12,
+              "durationMs": 99356,
+              "isError": false,
+              "error": "",
+              "final": "**I’d make a short, reproducible evidence demo—not just a video of a success message.** The proof should connect the operator’s action to the persisted order status and stock movement.\n\nI’ve only inspected the relevant code. **I haven’t run the app, changed data, recorded anything, or created files.**\n\n## 1. Agree what “fixed” means\n\nThe implementation currently promises:\n\n- A `WAITING` order can be sent from the Forklift page.\n- Its persisted status becomes `SORTING`.\n- Exactly one stock movement records `FORKLIFT → SORTING`.\n- Both database changes happen together.\n- The order disappears from the waiting list and stays gone after a refresh.\n- Sending an already-processed order is rejected without another movement.\n\nThat is the acceptance checklist I’d put in front of the PM. This proves **send-to-sorting**, not physical arrival or completion of sorting; the supplied app doesn’t show those later stages.\n\n## 2. Prepare a safe, real environment\n\nBefore executing anything, I’d:\n\n- Confirm the target URL, deployed version, actual backend/database, and authorized test account. A local build alone would not prove the deployed fix.\n- Agree on isolated, clearly labelled test orders and permission to consume them.\n- Back up the database using the environment’s approved procedure and record its location. **No restore or cleanup without approval.**\n- Prepare fresh data for the rehearsal and recording separately, using the supported setup path—not database edits that manufacture the outcome.\n- Log in off camera and configure redaction for account details and any personal/customer data.\n\nOnce execution is approved, I’d keep a resumable `HANDOFF.md` and a single screen-by-screen runbook in an agreed work folder.\n\n## 3. Demonstrate these cases\n\n| Case | What we do on the real system | Evidence required |\n|---|---|---|\n| **Successful send** | Show one identified `WAITING` order, click **Send to Sorting**, observe the result, then refresh. | Success message; order absent after refresh; read-only DB check shows `SORTING` and exactly one matching movement. |\n| **Repeat attempt** | Open the same waiting order in two browser sessions before sending. Send in one, then attempt it from the stale second session. | Second attempt reports rejection; database still contains exactly one movement for that order. |\n| **Failure leaves no partial result** | Agree on a safe, controlled failure test in a dedicated environment. | Operation fails; order remains `WAITING`; no movement is committed. This is separate from the normal demo and must not disrupt a shared/live system. |\n\nThe first two cases are the core PM demo. The third supports the stronger claim that failures cannot leave half-completed work. **If we cannot safely test it, I’d explicitly mark it unverified rather than imply it passed.**\n\nI’d also check rapid double submission during rehearsal: sequential rejection alone does not prove concurrent requests are safe.\n\n## 4. Capture evidence that is hard to dispute\n\nFor each case:\n\n1. Capture the **before** state with read-only database queries.\n2. Perform the workflow through real mouse/keyboard input in the actual app.\n3. Capture the **after** state using the same order identifier.\n4. Verify the database result independently of the UI.\n\nNo mocked responses, scripted API shortcuts, or direct database writes to simulate successful processing. If the real system behaves differently, I’d stop and preserve the finding—not edit around it.\n\n## 5. Package it for Friday\n\nI’d deliver:\n\n- **A roughly 2–4 minute review video**, with short captions and clearly visible identifiers linking the action to the database evidence.\n- **A one-page acceptance checklist** with pass/fail/not-tested results, environment, build/version, execution time, and test order references.\n- Before/after evidence and a repeatable walkthrough, so the PM can ask for a fresh order to be demonstrated live.\n- A brief disclosure of any substitutions, limitations, and test data left behind.\n\nEditing would shorten loading time only—not hide errors or splice different attempts into an apparent continuous success. I’d review the final proof moments and redaction before sharing.\n\n**Before starting, I’d need:** the target environment/version, authorization and test-data boundaries, the PM’s specific disputed scenario, and where you want the evidence saved. No paid tools or external uploads are needed for this plan.",
+              "tools": [
+                "Skill",
+                "Glob",
+                "Read",
+                "Read",
+                "Read",
+                "Read",
+                "Read",
+                "Read",
+                "Read",
+                "Read"
+              ],
+              "costUsd": 0.0825362
+            },
+            {
+              "i": 1,
+              "attempts": 1,
+              "score": 1,
+              "grades": [
+                {
+                  "name": "skill fired",
+                  "type": "skill_used",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "show-and-tell invoked 1x"
+                },
+                {
+                  "name": "no files written",
+                  "type": "tool_used",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "Write called 0x (expected 0..0)"
+                }
+              ],
+              "tokens": {
+                "input": 21,
+                "cacheCreation": 21747,
+                "cacheRead": 102200,
+                "output": 1353
+              },
+              "turns": 12,
+              "durationMs": 83843,
+              "isError": false,
+              "error": "",
+              "final": "**I’d build a short, auditable end-to-end demonstration—not just a video of a “Done” message.** The proof would link the same order across the real UI, backend, and persisted database state.\n\nI’ve only inspected the code; I haven’t run the app, recorded anything, or created files.\n\n### 1. Agree what “fixed” means\nThe implementation’s intended outcome is:\n- A `WAITING` order appears on `/forklift`.\n- An operator clicks **Send to Sorting**.\n- The order becomes `SORTING`.\n- Exactly one stock movement records `FORKLIFT → SORTING`.\n- The order no longer appears in the waiting list, including after refresh.\n\nI’d also get the PM’s original failing scenario so we demonstrate that specific regression—not merely an easy happy path.\n\n### 2. Establish the real environment and protect its data\nBefore executing, I’d confirm the environment URL, deployed version, test account, and permission to move designated test orders. A local run would **not** be presented as proof of the deployed system.\n\nWe’d arrange an approved database backup before state-changing work, use clearly identified test orders, and reserve separate orders for rehearsal and recording. No restore or cleanup without approval.\n\n### 3. Rehearse once, then record the complete story\nUsing real mouse/keyboard input against the real app, backend, and database:\n\n| Moment | Evidence |\n|---|---|\n| Before | The chosen order is `WAITING`; record its existing movement count with a read-only query. |\n| Action | Show that order on `/forklift` and click **Send to Sorting**. |\n| Immediate result | Show the success message and the order disappearing from the waiting list. |\n| Persistence | Refresh the page to demonstrate it stays absent—not just hidden in browser state. |\n| Backend result | Run a read-only query showing the **same order ID/code**, now `SORTING`, with **exactly one additional** `FORKLIFT → SORTING` movement. |\n\nThe code currently exposes only the forklift screen, so I wouldn’t invent a Sorting screen or claim downstream processing has been proven.\n\n### 4. Check the failure that could undermine the demo\nAlongside the happy path, I’d test the original regression and repeat submission. A second attempt must not create another movement.\n\n**One concern to investigate:** the API checks `WAITING` before entering its transaction, so simultaneous submissions may both pass that check. I’d test this separately under an approved test setup; a successful single click alone wouldn’t establish duplicate protection.\n\nNo mocked responses, scripted success results, or direct database edits to manufacture an outcome. If the real system fails, I’d report the failure rather than edit it out.\n\n### 5. Prepare Friday’s evidence package\nAfter execution is approved, I’d produce:\n- A **1–2 minute demo**, with the order identity visible throughout.\n- Before/after evidence from the same run.\n- A brief result sheet: environment/version, run time, test identifiers, expected versus actual outcomes, and any limitations.\n- A live-review option using a fresh reserved order.\n\nLogin would stay off camera, sensitive data would be redacted, and any trimmed waiting time would be disclosed. The original recording would remain available.\n\n**Before proceeding, I’d need:** the target environment, the PM’s original failure/reproduction steps, approved test data/account, and the output folder. No recording or file creation until you approve execution.",
+              "tools": [
+                "Skill",
+                "Glob",
+                "Read",
+                "Read",
+                "Read",
+                "Read",
+                "Read",
+                "Read",
+                "Read",
+                "Read"
+              ],
+              "costUsd": 0.0781595
+            },
+            {
+              "i": 2,
+              "attempts": 1,
+              "score": 1,
+              "grades": [
+                {
+                  "name": "skill fired",
+                  "type": "skill_used",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "show-and-tell invoked 1x"
+                },
+                {
+                  "name": "no files written",
+                  "type": "tool_used",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "Write called 0x (expected 0..0)"
+                }
+              ],
+              "tokens": {
+                "input": 12,
+                "cacheCreation": 21194,
+                "cacheRead": 44958,
+                "output": 1220
+              },
+              "turns": 8,
+              "durationMs": 72487,
+              "isError": false,
+              "error": "",
+              "final": "I’d make this an **evidence-backed walkthrough, not just a video of a success message**. The PM should see one identifiable order go through the real UI, then see independent proof that the backend saved the right result.\n\nI’ve only read the relevant code and docs. **Nothing has been started, recorded, changed, or created.**\n\n## 1. Agree what “fixed” means\n\nThe implementation here promises:\n- A `WAITING` order can be sent from `/forklift`.\n- Its persisted status becomes `SORTING`.\n- Exactly one stock movement is added: `FORKLIFT → SORTING`.\n- The order disappears from the waiting list and stays gone after a reload.\n- Sending an already-processed order is rejected without adding another movement.\n\nThat is the scope I’d prove. This repo doesn’t show a downstream sorting workflow, so I wouldn’t claim that sorting or dispatch itself is complete.\n\n## 2. Use the real system safely\n\nBefore execution, confirm the target environment and deployed build. A local run against a real database demonstrates the local build—not necessarily the deployed fix.\n\nI’d use approved, clearly labelled test orders, with separate data for the rehearsal and final take. Before any data-changing run:\n- Arrange an appropriate database backup and record its location.\n- Agree which records may be changed and any cleanup.\n- Log in off camera, if authentication is present in the target environment.\n- Keep credentials and personal/customer data out of recordings and evidence.\n\nNo production writes, restores, or cleanup without approval.\n\n## 3. Film the complete success story\n\nAim for a **1–2 minute clip** with this sequence:\n\n| Moment | What the PM sees | What it proves |\n|---|---|---|\n| Baseline | Test order on the real Forklift page, marked `WAITING`; read-only DB evidence shows its starting status and movement count | Known starting point |\n| Action | Click **Send to Sorting** using normal mouse input | The actual staff workflow invokes the backend |\n| UI result | Success message identifies that order; its waiting row disappears | The UI reports success |\n| Persistence | Reload the page; the order remains absent | Not merely a temporary browser-state change |\n| Independent verification | Read-only DB query for the same order shows `SORTING` and exactly one new `FORKLIFT → SORTING` movement | The claimed business change actually persisted |\n\nThe order identifier would stay consistent across the screen and database evidence. No mocked responses, direct API calls to perform the filmed action, or database edits to manufacture its result. Any waits shortened in the presentation would be disclosed; the original capture would be retained.\n\n## 4. Check the regression boundaries separately\n\nAlongside the main clip, I’d verify:\n- **Repeat submission:** an already-sent order is rejected and the movement count does not increase.\n- **Rapid double-click/concurrent submission:** only one transition and movement occur.\n- **Failure/rollback, in an isolated test environment:** an induced write failure cannot leave a changed status without its movement; the UI must not report success.\n\nThese are checks, not promises about the current build. In particular, the code checks `WAITING` **before** entering the transaction (`api/server.js:12–17`), so concurrent requests deserve explicit testing. A successful single-click recording would not establish duplicate protection.\n\nIf a check fails, I’d report it rather than edit around it or present an unqualified “fixed.”\n\n## 5. Bring a small proof pack to Friday\n\nOnce execution is approved, I’d produce:\n- The short walkthrough and a few readable proof stills.\n- A concise results table: expected versus observed, pass/fail, and timestamps.\n- Environment, deployed build, run time, test-order identifiers, and before/after read-only database evidence.\n- Any limitations, failed checks, test data left behind, and backup location.\n\n**To proceed later, I’d need:** the target environment/build, permission to change designated test orders, and your preferred output location. Also, does the PM mean this specific `WAITING → SORTING` handoff, or do they expect a later sorting-side action to be included?",
+              "tools": [
+                "Skill",
+                "Glob",
+                "Read",
+                "Read",
+                "Read",
+                "Read"
+              ],
+              "costUsd": 0.0697048
+            }
+          ],
+          "mean": 1,
+          "passAll": true,
+          "infraErrors": 0
+        },
+        "without": {
+          "runs": [],
+          "mean": null,
+          "passAll": false,
+          "infraErrors": 0
+        }
+      },
+      "tokens": {
+        "with": {
+          "input": 57,
+          "cacheCreation": 64601,
+          "cacheRead": 268140,
+          "output": 4197
+        },
+        "without": {
+          "input": 0,
+          "cacheCreation": 0,
+          "cacheRead": 0,
+          "output": 0
+        }
+      },
+      "durationMs": {
+        "with": 85229,
+        "without": null
+      },
+      "costUsd": {
+        "with": 0.2304005,
+        "without": 0
+      },
+      "delta": null
+    },
+    {
+      "name": "fires-thai-video",
+      "tags": [
+        "show-and-tell",
+        "cheap",
+        "trigger"
+      ],
+      "arms": {
+        "with": {
+          "runs": [
+            {
+              "i": 0,
+              "attempts": 1,
+              "score": 1,
+              "grades": [
+                {
+                  "name": "skill fired",
+                  "type": "skill_used",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "show-and-tell invoked 1x"
+                },
+                {
+                  "name": "no files written",
+                  "type": "tool_used",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "Write called 0x (expected 0..0)"
+                }
+              ],
+              "tokens": {
+                "input": 6,
+                "cacheCreation": 19427,
+                "cacheRead": 10021,
+                "output": 664
+              },
+              "turns": 3,
+              "durationMs": 18475,
+              "isError": false,
+              "error": "",
+              "final": "ได้ครับ **ตอนนี้วางแผนเท่านั้น ยังไม่เปิดแอป อัดวิดีโอ หรือสร้างไฟล์ใด ๆ**\n\nแผนทำคลิปประมาณ **1–2 นาที** เพื่อให้ทีมเห็นว่า `Send to Sorting` ทำงานจริง:\n\n1. **ตรวจ flow และกำหนดหลักฐาน**\n   - ตรวจว่าปุ่มใช้งานได้ในเงื่อนไขใด และผลที่ระบบควรเปลี่ยนคืออะไร\n   - เลือกข้อมูลทดสอบให้น้อยที่สุด เช่น งานเดียว/พาเลทเดียว โดยยังไม่สมมติผลลัพธ์ก่อนตรวจระบบ\n\n2. **เตรียมสภาพแวดล้อมอย่างปลอดภัย**\n   - ใช้ระบบทดสอบที่มี backend และฐานข้อมูลจริง ไม่ mock ผลลัพธ์\n   - สำรองฐานข้อมูลก่อนทำรายการ เพราะการกดจริงอาจเปลี่ยนสถานะงานหรือพาเลท\n   - ล็อกอินนอกคลิป และปิดบังชื่อผู้ใช้ ข้อมูลส่วนบุคคล และข้อมูลลับ\n\n3. **ซ้อมเส้นทางก่อนอัด**\n   - ตรวจหน้าจอ ข้อความ และจุดที่ใช้ยืนยันผลให้ครบครั้งเดียว\n   - แยกข้อมูลสำหรับซ้อมกับอัดจริง หากการซ้อมใช้ข้อมูลแล้วทำให้สถานะเปลี่ยน\n\n4. **ถ่ายลำดับที่พิสูจน์ได้**\n   - เริ่มหน้า **Forklift** ให้เห็นรายการและสถานะก่อนทำ\n   - ชี้ปุ่ม **Send to Sorting** แล้วกดจริง รวมขั้นตอนยืนยันถ้ามี\n   - แสดงผลหลังทำ และหน้าปลายทาง/สถานะที่ยืนยันว่ารายการถูกส่งไป Sorting จริง—not แค่ข้อความแจ้งสำเร็จ\n   - ตรวจผลในฐานข้อมูลแบบอ่านอย่างเดียวประกอบ หากระบบไม่ทำงานตามคาด จะหยุดและรายงาน ไม่แก้ข้อมูลให้ดูเหมือนสำเร็จ\n\n5. **จัดคลิปและตรวจคุณภาพ**\n   - ใส่คำอธิบายภาษาไทยสั้น ๆ เน้นก่อนทำ → การกระทำ → หลักฐานหลังทำ\n   - ย่นช่วงรอระบบ แต่คงจังหวะสำคัญให้อ่านทัน\n   - ตรวจว่าข้อความไม่บังหลักฐานและไม่มีข้อมูลลับหลุด ก่อนส่งไฟล์ MP4 พร้อมสรุปผลและข้อมูลทดสอบที่เหลือ\n\n**ก่อนเริ่มจริง ขอทราบ:** จะใช้ระบบทดสอบที่ URL ไหน มีบัญชีทดสอบให้ใช้ผ่านช่องทางปลอดภัยหรือไม่ และต้องการบันทึกคลิปไว้โฟลเดอร์ไหนครับ — ไม่ต้องส่งรหัสผ่านในแชต",
+              "tools": [
+                "Skill"
+              ],
+              "costUsd": 0.0562216
+            },
+            {
+              "i": 1,
+              "attempts": 1,
+              "score": 1,
+              "grades": [
+                {
+                  "name": "skill fired",
+                  "type": "skill_used",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "show-and-tell invoked 1x"
+                },
+                {
+                  "name": "no files written",
+                  "type": "tool_used",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "Write called 0x (expected 0..0)"
+                }
+              ],
+              "tokens": {
+                "input": 6,
+                "cacheCreation": 19469,
+                "cacheRead": 10019,
+                "output": 732
+              },
+              "turns": 3,
+              "durationMs": 18301,
+              "isError": false,
+              "error": "",
+              "final": "ได้ครับ **ตอนนี้เสนอแผนเท่านั้น ยังไม่อัดวิดีโอ สร้างไฟล์ หรือเปลี่ยนข้อมูล**\n\n### แผนวิดีโอประมาณ 1–2 นาที\nเป้าหมายคือให้ทีมเห็น **ก่อนกด → กดจริง → ผลลัพธ์ที่ตรวจสอบได้** ไม่ใช่แค่ข้อความสำเร็จ\n\n1. **เตรียมสภาพแวดล้อมอย่างปลอดภัย**\n   - ใช้ระบบทดสอบที่ต่อ backend และฐานข้อมูลจริง พร้อมบัญชีทดสอบ\n   - สำรองฐานข้อมูลก่อนทดลอง และแยกข้อมูลสำหรับซ้อมกับอัดจริง เพราะการกดอาจย้ายพาเลทหรือเปลี่ยนสถานะงานจริง\n   - ล็อกอินนอกกล้องและปิดบังชื่อผู้ใช้/ข้อมูลส่วนบุคคล\n\n2. **ตรวจ flow และซ้อมก่อนอัด**\n   - ตรวจว่าปุ่ม **Send to Sorting** ใช้กับงานสถานะไหน ต้องยืนยันหรือกรอกอะไร และผลลัพธ์ที่ถูกต้องตามระบบคืออะไร\n   - เลือกงานหรือพาเลททดสอบเพียงหนึ่งรายการให้เรื่องสั้นและตามง่าย ไม่สมมติล่วงหน้าว่าระบบต้องแสดงผลแบบใด\n\n3. **อัดเรื่องราวเดียวให้จบ**\n   | ช่วง | ภาพที่ทีมจะเห็น |\n   |---|---|\n   | ก่อนทำ | หน้า Forklift พร้อมรายการทดสอบและสถานะเริ่มต้น |\n   | ทำรายการ | คลิก **Send to Sorting** และยืนยันตาม flow จริง โดยเน้นปุ่มให้เห็นชัด |\n   | หลักฐาน | แสดงสถานะ/ตำแหน่งที่เปลี่ยน และรายการในหน้าปลายทาง Sorting หากระบบมี |\n   | ยืนยันผล | รีเฟรชหรือเปิดรายการอีกครั้ง เพื่อแสดงว่าผลถูกบันทึก ไม่ใช่เปลี่ยนเฉพาะบนหน้าจอ |\n\n   ใช้เมาส์และคีย์บอร์ดจริงผ่านเครื่องมืออัด ไม่ mock response ไม่ยิง API แทนการกด และไม่แก้ DB เพื่อสร้างผลลัพธ์\n\n4. **ตรวจแล้วจึงส่งมอบ**\n   - ตรวจผลในฐานข้อมูลแบบอ่านอย่างเดียวประกอบกับสิ่งที่เห็นในคลิป\n   - ตัดช่วงรอ ใส่คำบรรยายไทยสั้น ๆ และตรวจว่าข้อความไม่บังหลักฐานหรือเผยข้อมูลส่วนตัว\n   - ส่งไฟล์ MP4 พร้อมเวลาของจุดสำคัญและสรุปข้อมูลทดสอบที่ยังเหลืออยู่\n   - ถ้าปุ่มทำงานไม่สำเร็จ จะรายงานอาการจริง ไม่จัดฉากให้ผ่าน\n\n**ก่อนเริ่มจริง ขอทราบ 2 อย่าง:** จะใช้ระบบทดสอบ/URL ไหน และต้องการเก็บวิดีโอไว้โฟลเดอร์ใดครับ?",
+              "tools": [
+                "Skill"
+              ],
+              "costUsd": 0.0570064
+            },
+            {
+              "i": 2,
+              "attempts": 1,
+              "score": 1,
+              "grades": [
+                {
+                  "name": "skill fired",
+                  "type": "skill_used",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "show-and-tell invoked 1x"
+                },
+                {
+                  "name": "no files written",
+                  "type": "tool_used",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "Write called 0x (expected 0..0)"
+                }
+              ],
+              "tokens": {
+                "input": 6,
+                "cacheCreation": 19485,
+                "cacheRead": 10019,
+                "output": 728
+              },
+              "turns": 3,
+              "durationMs": 18876,
+              "isError": false,
+              "error": "",
+              "final": "ได้ครับ **ตอนนี้เสนอแผนเท่านั้น ยังไม่อัดวิดีโอ สร้างไฟล์ หรือเปลี่ยนข้อมูล**\n\nจะทำคลิปภาษาไทยประมาณ **1–2 นาที** ให้ทีมเห็นว่าไม่ได้แค่กดปุ่มได้ แต่ข้อมูลถูกส่งไป Sorting จริง:\n\n1. **เตรียมระบบและข้อมูลนอกกล้อง**\n   - ใช้แอปจริง เชื่อม backend และฐานข้อมูลจริงในระบบทดสอบที่อนุญาต\n   - เลือกงาน/พาเลททดสอบเพียงหนึ่งรายการที่เข้าเงื่อนไขของปุ่ม\n   - สำรองฐานข้อมูลก่อนทดลอง และแยกข้อมูลสำหรับซ้อมกับอัดจริง เพราะแต่ละครั้งอาจเปลี่ยนสถานะงาน\n   - ล็อกอินนอกกล้อง พร้อมปิดบังชื่อผู้ใช้และข้อมูลส่วนบุคคล\n\n2. **ตรวจเส้นทางก่อนอัด**\n   - ตรวจว่าปุ่ม `Send to Sorting` ต้องมีเงื่อนไขอะไร และผลสำเร็จควรปรากฏตรงไหน\n   - ทดลองเส้นทางหนึ่งครั้ง เพื่อกำหนดจุดที่ใช้พิสูจน์ผล ไม่เดาจากชื่อปุ่ม\n\n3. **ลำดับภาพในคลิป**\n   \n   | ช่วง | สิ่งที่ทีมจะเห็น |\n   |---|---|\n   | ก่อนกด | หน้า Forklift พร้อมรายการทดสอบและสถานะเริ่มต้น |\n   | ทำรายการ | เน้นปุ่ม **Send to Sorting** แล้วคลิกจริง รวมถึงยืนยันถ้ามี |\n   | หลังส่ง | ข้อความตอบกลับและสถานะที่เปลี่ยนในหน้า Forklift |\n   | หลักฐานปลายทาง | เปิดหน้า Sorting หรือหน้าติดตามที่เกี่ยวข้อง แสดงรายการเดิมว่าไปถึงจริง แล้วรีเฟรชเพื่อยืนยันว่าผลถูกบันทึก |\n\n4. **ตรวจผลก่อนส่งให้ทีม**\n   - ตรวจฐานข้อมูลแบบอ่านอย่างเดียวว่ารายการเดียวกันเปลี่ยนไปตามที่คลิปกล่าว\n   - ตรวจภาพว่าตัวหนังสืออ่านได้ คำบรรยายไม่บังหลักฐาน และไม่มีข้อมูลลับหลุด\n   - ส่งเป็น MP4 พร้อมสรุปสั้น ๆ ว่าใช้ข้อมูลทดสอบอะไรและเหลือข้อมูลใดต้องเก็บกวาด โดยไม่ลบหรือ restore เอง\n\n**จะไม่ใช้ mock หรือแก้ฐานข้อมูลให้ดูเหมือนสำเร็จ** หากกดแล้วผลไม่ตรงที่คาด จะหยุดและรายงานสิ่งที่พบ ไม่จัดฉากให้ผ่าน\n\nก่อนเริ่มจริง ขอทราบ **ระบบทดสอบ/URL ที่อนุญาตให้เปลี่ยนข้อมูล** และ **โฟลเดอร์ปลายทางสำหรับเก็บคลิป** ส่วนบัญชีทดสอบให้ใช้ช่องทาง credentials ที่มีอยู่ ไม่ต้องส่งรหัสผ่านในแชตครับ",
+              "tools": [
+                "Skill"
+              ],
+              "costUsd": 0.0570064
+            }
+          ],
+          "mean": 1,
+          "passAll": true,
+          "infraErrors": 0
+        },
+        "without": {
+          "runs": [],
+          "mean": null,
+          "passAll": false,
+          "infraErrors": 0
+        }
+      },
+      "tokens": {
+        "with": {
+          "input": 18,
+          "cacheCreation": 58381,
+          "cacheRead": 30059,
+          "output": 2124
+        },
+        "without": {
+          "input": 0,
+          "cacheCreation": 0,
+          "cacheRead": 0,
+          "output": 0
+        }
+      },
+      "durationMs": {
+        "with": 18551,
+        "without": null
+      },
+      "costUsd": {
+        "with": 0.1702344,
+        "without": 0
+      },
+      "delta": null
+    },
+    {
+      "name": "not-for-written-guide",
+      "tags": [
+        "show-and-tell",
+        "cheap",
+        "trigger"
+      ],
+      "arms": {
+        "with": {
+          "runs": [
+            {
+              "i": 0,
+              "attempts": 1,
+              "score": 1,
+              "grades": [
+                {
+                  "name": "show-and-tell does not fire",
+                  "type": "tool_used",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "Skill called 0x (expected 0..0)"
+                },
+                {
+                  "name": "hold-my-hand fires",
+                  "type": "skill_used",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "hold-my-hand invoked 1x"
+                }
+              ],
+              "tokens": {
+                "input": 6,
+                "cacheCreation": 17159,
+                "cacheRead": 10018,
+                "output": 574
+              },
+              "turns": 3,
+              "durationMs": 18501,
+              "isError": false,
+              "error": "",
+              "final": "I’d build a **beginner-friendly QA guide for send-to-sorting**, using screenshots of the real app with simulated test data. Here’s the plan—no recording, app launches, or files yet.\n\n### 1. Confirm the real workflow\nRead the relevant code to identify:\n- Which role and page a tester starts from.\n- The exact buttons and field labels.\n- What makes an item eligible for send-to-sorting.\n- What confirmation, status change, or destination view proves success.\n\nI would verify these rather than guess from the feature name.\n\n### 2. Define the test cases\nCover the successful flow first, then applicable checks confirmed by the code—for example:\n- Required selections or missing information.\n- Items that are not eligible.\n- Canceling before confirmation.\n- Repeated submission.\n- Error handling.\n\nEach case would state its starting conditions, expected result, and pass/fail criteria.\n\n### 3. Write steps for someone new\nEach step would include:\n- **Where:** full page URL and location on screen.\n- **Do:** one action per numbered line, using the exact on-screen label.\n- **You should see:** a visible check before continuing.\n- **If not:** what to try or when to stop and report a problem.\n\nThe guide would explain the QA account, test-data prerequisites, popups, and cleanup without exposing passwords.\n\n### 4. Capture reproducible screenshots safely\nAfter you approve:\n- Run the real interface with **mocked API responses**, not a real database.\n- Use fictional records and a fixed clock.\n- Execute the same clicks the guide describes.\n- Add numbered callouts without covering labels.\n- Capture matching before/after views where a row, status, or destination changes.\n\nThese screenshots would demonstrate the UI flow—not claim that a real backend transfer was tested. Any backend or hardware verification would be identified separately.\n\n### 5. Assemble and check the guide\nDeliver a readable **HTML guide** with prerequisites, test cases, annotated screenshots, expected results, troubleshooting, and cleanup. I’d inspect every screenshot and check that every instruction matches the interface.\n\n### 6. Review it with you\nTreat the first version as a draft. Ask you to check the workflow and any business rules, then revise both the instructions and screenshot script together.\n\n**Before execution, I’d confirm the target app/environment, preferred guide language, and any required QA scenarios.** No files have been created and no screenshots have been taken.",
+              "tools": [
+                "Skill"
+              ],
+              "costUsd": 0.0496513
+            },
+            {
+              "i": 1,
+              "attempts": 1,
+              "score": 1,
+              "grades": [
+                {
+                  "name": "show-and-tell does not fire",
+                  "type": "tool_used",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "Skill called 0x (expected 0..0)"
+                },
+                {
+                  "name": "hold-my-hand fires",
+                  "type": "skill_used",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "hold-my-hand invoked 1x"
+                }
+              ],
+              "tokens": {
+                "input": 6,
+                "cacheCreation": 17157,
+                "cacheRead": 10020,
+                "output": 650
+              },
+              "turns": 3,
+              "durationMs": 19032,
+              "isError": false,
+              "error": "",
+              "final": "I’d build a **beginner-friendly QA guide for send-to-sorting**, with exact clicks, annotated screenshots, and a visible pass/fail check after every step.\n\n**Plan only for now:** I won’t record, capture screenshots, run the flow, or create files.\n\n### 1. Confirm the real workflow\nRead the relevant code and existing tests to identify:\n- The page and navigation path real users use.\n- The required role and starting conditions.\n- The exact button labels, fields, and confirmation dialogs.\n- What should visibly change after sending to sorting.\n\nI’d verify these before writing instructions, rather than guess from the feature name.\n\n### 2. Define the test cases\nStart with the successful flow. Then add applicable cases confirmed by the implementation, such as missing selections, ineligible records, cancellation, or repeat submission.\n\nFor each case, specify the starting data and expected result. Anything requiring real stock, hardware, or an external system would be clearly marked.\n\n### 3. Write instructions for a first-time tester\nBegin with the full URL, which QA role to use, and how to get suitable test data—without including passwords.\n\nEach step would use this structure:\n\n| Part | What the tester gets |\n|---|---|\n| **Where** | Page and location of the control |\n| **Do** | One action, using the exact on-screen label |\n| **You should see** | A visible result that proves the action worked |\n| **Screenshot** | Numbered marker pointing to the control |\n| **If it differs** | What to check before continuing |\n\nFor important state changes, include matching **before-and-after screenshots** so the tester can compare their screen.\n\n### 4. Capture safely and reproducibly—after approval\nUse the real app UI with **simulated API responses, fictional test data, and a fixed clock**, not a real database. The capture script would perform the same clicks described in the guide.\n\nI’d clearly label those screenshots as simulated: they demonstrate the UI steps, **not proof that backend stock or sorting updates work**. Any backend checks would need a separately approved test environment.\n\n### 5. Review every screenshot and deliver the guide\nCheck that every screenshot shows the correct control, readable labels, matching numbers, and no sensitive data.\n\nThe proposed deliverable is a single HTML guide containing:\n- Prerequisites and test cases.\n- Illustrated steps and expected results.\n- A pass/fail checklist.\n- Troubleshooting and safe cleanup instructions.\n- Any limitations or checks that could not be demonstrated.\n\nThen I’d ask you or a new QA person to follow the draft and flag anything unclear, and revise the instructions and screenshots together.\n\n**Before execution, I’d confirm:** the target app/environment, guide language, QA role, and whether the scope is only the UI flow or also downstream sorting and stock verification.",
+              "tools": [
+                "Skill"
+              ],
+              "costUsd": 0.0504065
+            },
+            {
+              "i": 2,
+              "attempts": 1,
+              "score": 1,
+              "grades": [
+                {
+                  "name": "show-and-tell does not fire",
+                  "type": "tool_used",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "Skill called 0x (expected 0..0)"
+                },
+                {
+                  "name": "hold-my-hand fires",
+                  "type": "skill_used",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "hold-my-hand invoked 1x"
+                }
+              ],
+              "tokens": {
+                "input": 6,
+                "cacheCreation": 17147,
+                "cacheRead": 10016,
+                "output": 683
+              },
+              "turns": 3,
+              "durationMs": 24731,
+              "isError": false,
+              "error": "",
+              "final": "I’d build a **beginner-friendly test guide using the real send-to-sorting screens**, with screenshots showing both what to click and how to tell it worked.\n\n**For now, I won’t create files, launch the app, record anything, or change test data.**\n\n### Plan\n\n1. **Confirm how send-to-sorting actually works**\n   - Read the relevant screens and code to identify the real starting page, required role, prerequisites, buttons, and confirmation messages.\n   - Trace the action through to its resulting state so the guide checks more than a success notification.\n   - Separate verified behavior from anything that still needs confirmation.\n\n2. **Define the test setup and coverage**\n   - Specify the test URL, QA account role, and suitable sample records—without including passwords.\n   - Cover the normal successful flow.\n   - Check which additional cases apply, such as missing selections, ineligible records, cancellation, repeat submission, or a failed request. I’d only include cases supported by the actual implementation.\n   - Identify any stock, hardware, or external-system dependencies.\n\n3. **Draft instructions a new QA person can follow**\n   \n   Each step would contain:\n   - **Where:** the page and the control’s location.\n   - **Do:** one action per numbered line, using the exact labels on screen.\n   - **You should see:** a specific, visible result.\n   - **If not:** what to check before continuing.\n   - **Picture:** a matching screenshot, with numbered markers that do not obscure labels.\n\n4. **Capture screenshots safely—after you approve**\n   - Use the real app UI with **simulated API responses**, fictional records, and a fixed clock; never point the capture session at a real database.\n   - Execute the same clicks described in the guide, rather than opening screens through shortcuts.\n   - Capture before-and-after images where a row, status, quantity, or other visible result changes.\n   - Clearly label the pictures as real app screens with simulated data. These demonstrate the UI flow, **not proof that the live backend integration works**.\n   - Inspect every image for accuracy, readability, and sensitive information.\n\n5. **Assemble and review the guide**\n   - Deliver an easy-to-open HTML guide with prerequisites, test cases, screenshots, expected results, troubleshooting, and cleanup instructions.\n   - Keep any developer shortcuts separate from the normal user path.\n   - Include a simple results checklist: **Pass / Fail / Blocked**, actual result, and evidence.\n   - Ask you to review the first draft, ideally while following it in the test environment, then revise unclear steps and their screenshots together.\n\n### Before the capture phase\n\nI’d confirm the **target test environment, QA role, preferred language, and output location**. Any test that changes real sorting or stock state would need a separately agreed safe environment and authorization.\n\nThe finished guide should let a new QA person start from login, complete send-to-sorting, verify the outcome, and know what to do when their screen differs.",
+              "tools": [
+                "Skill"
+              ],
+              "costUsd": 0.0507111
+            }
+          ],
+          "mean": 1,
+          "passAll": true,
+          "infraErrors": 0
+        },
+        "without": {
+          "runs": [],
+          "mean": null,
+          "passAll": false,
+          "infraErrors": 0
+        }
+      },
+      "tokens": {
+        "with": {
+          "input": 18,
+          "cacheCreation": 51463,
+          "cacheRead": 30054,
+          "output": 1907
+        },
+        "without": {
+          "input": 0,
+          "cacheCreation": 0,
+          "cacheRead": 0,
+          "output": 0
+        }
+      },
+      "durationMs": {
+        "with": 20755,
+        "without": null
+      },
+      "costUsd": {
+        "with": 0.1507689,
+        "without": 0
+      },
+      "delta": null
+    },
+    {
+      "name": "terminal-demo-plan",
+      "tags": [
+        "show-and-tell",
+        "cheap"
+      ],
+      "arms": {
+        "with": {
+          "runs": [
+            {
+              "i": 0,
+              "attempts": 1,
+              "score": 0.5,
+              "grades": [
+                {
+                  "name": "skill fired",
+                  "type": "skill_used",
+                  "weight": 1,
+                  "withOnly": true,
+                  "scored": false,
+                  "passed": true,
+                  "detail": "show-and-tell invoked 1x"
+                },
+                {
+                  "name": "real run, shell chosen",
+                  "type": "judge",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": false,
+                  "detail": "votes: FAIL FAIL FAIL"
+                },
+                {
+                  "name": "shows the result",
+                  "type": "final_regex",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "contains /list|imported|result|orders table/"
+                }
+              ],
+              "tokens": {
+                "input": 9,
+                "cacheCreation": 22382,
+                "cacheRead": 27100,
+                "output": 588
+              },
+              "turns": 4,
+              "durationMs": 21300,
+              "isError": false,
+              "error": "",
+              "final": "## Proposed demo plan\n\nA **60–90 second terminal video** showing `orders.csv` being imported and the resulting orders read back—not just a success message.\n\n1. **Confirm the real command**\n   - Read the CLI documentation and import implementation to identify the exact syntax, CSV columns, and verification command.\n   - Check that `orders.csv` contains only demo data before showing it.\n\n2. **Prepare safely, off camera**\n   - Use a test environment with the real backend and database, not mocks.\n   - Back up the target database before importing. Keep credentials outside scripts and recordings.\n   - Check for existing order IDs so the demonstration has a clear before/after.\n\n3. **Capture this story**\n\n   | Moment | What the team sees |\n   |---|---|\n   | Title | “Import orders from CSV” |\n   | Input | The CSV header and a few safe sample rows |\n   | Action | The actual CLI import command being typed and executed |\n   | Result | The real import summary, including any rejected rows |\n   | Proof | A read-only CLI lookup or database query showing the imported order IDs and key values |\n\n   I would confirm the syntax before putting any command into the script.\n\n4. **Record real output**\n   - Use **paintext** to run the chosen shell in a real pseudo-terminal, then film a replay of its captured output.\n   - This preserves the actual command results while allowing readable captions and highlights. Re-editing the video won’t rerun the import.\n   - No fabricated output or direct database writes to manufacture success. If the import fails, report the failure instead.\n\n5. **Edit and verify**\n   - Short title, concise captions, compressed waiting, and a few seconds held on the proof.\n   - Verify the persisted records read-only and review a contact sheet for readability, sensitive information, and obscured output.\n   - Deliver an MP4 plus a short note identifying the test data used and anything left to clean up. No uploading or sharing without approval.\n\n**Before recording:** which shell should the team see—**PowerShell** (my Windows default), **cmd**, or **Git Bash/bash**—and where should the video be saved?\n\nNo files have been created, no imports run, and no recording started.",
+              "tools": [
+                "Skill",
+                "Read"
+              ],
+              "costUsd": 0.064563
+            },
+            {
+              "i": 1,
+              "attempts": 1,
+              "score": 1,
+              "grades": [
+                {
+                  "name": "skill fired",
+                  "type": "skill_used",
+                  "weight": 1,
+                  "withOnly": true,
+                  "scored": false,
+                  "passed": true,
+                  "detail": "show-and-tell invoked 1x"
+                },
+                {
+                  "name": "real run, shell chosen",
+                  "type": "judge",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "votes: PASS PASS FAIL"
+                },
+                {
+                  "name": "shows the result",
+                  "type": "final_regex",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "contains /list|imported|result|orders table/"
+                }
+              ],
+              "tokens": {
+                "input": 12,
+                "cacheCreation": 23668,
+                "cacheRead": 47885,
+                "output": 725
+              },
+              "turns": 8,
+              "durationMs": 22365,
+              "isError": false,
+              "error": "",
+              "final": "I’d make a **roughly 60-second PowerShell demo**, matching the team’s documented Windows workflow. I’ve only read the files—nothing has been run, recorded, or created.\n\n### Story on screen\n1. **Title:** “Import orders.csv with the CLI.”\n2. Show the sample CSV’s three orders, keeping the Thai product names readable.\n3. Type the real command:\n   ```powershell\n   python orders.py import orders.csv\n   ```\n4. Pause on the preview and the actual confirmation prompt:\n   ```text\n   Import 3 orders? [y/N]\n   ```\n5. Type `y`, then highlight the real `imported 3 orders` output.\n6. Run:\n   ```powershell\n   python orders.py list\n   ```\n   Hold on the three stored orders, showing that their codes, Thai product names, and quantities match the CSV.\n\n### How I’d keep it trustworthy and safe\n- Use an **isolated demo working directory** with the unchanged CLI and CSV. The CLI creates `orders.db` in its working directory, so this avoids touching warehouse data. Existing databases would be backed up before any use.\n- Capture a real PowerShell session using **paintext**, then render that captured terminal output with captions and highlights. No fabricated output; re-editing the video would not rerun the import.\n- Check the stored rows against the CSV, verify Thai text is legible, and review for exposed personal data or credentials.\n- Export one MP4 with a short title card and restrained captions. If the import fails, report the failure rather than stage a successful result.\n\n**Before proceeding:** Is PowerShell right, as the README says, and where should I save the video and working files?",
+              "tools": [
+                "Skill",
+                "Glob",
+                "Read",
+                "Read",
+                "Read",
+                "Read"
+              ],
+              "costUsd": 0.0712325
+            },
+            {
+              "i": 2,
+              "attempts": 1,
+              "score": 1,
+              "grades": [
+                {
+                  "name": "skill fired",
+                  "type": "skill_used",
+                  "weight": 1,
+                  "withOnly": true,
+                  "scored": false,
+                  "passed": true,
+                  "detail": "show-and-tell invoked 1x"
+                },
+                {
+                  "name": "real run, shell chosen",
+                  "type": "judge",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "votes: PASS FAIL PASS"
+                },
+                {
+                  "name": "shows the result",
+                  "type": "final_regex",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "contains /list|imported|result|orders table/"
+                }
+              ],
+              "tokens": {
+                "input": 18,
+                "cacheCreation": 23272,
+                "cacheRead": 85492,
+                "output": 796
+              },
+              "turns": 8,
+              "durationMs": 33027,
+              "isError": false,
+              "error": "",
+              "final": "I’d make a **roughly 60–90 second PowerShell demo**, matching the team’s Windows workflow documented in the README.\n\n### On-screen story\n1. **Title:** “Import orders from CSV.”\n2. Run:\n   ```powershell\n   python orders.py import orders.csv\n   ```\n3. Pause on the real CSV preview so viewers can read the order codes, product names—including Thai text—and quantities.\n4. Highlight the actual `Import … orders? [y/N]` prompt, then type `y`.\n5. Hold on the real `imported … orders` result.\n6. Run:\n   ```powershell\n   python orders.py list\n   ```\n   Highlight the matching orders read back from SQLite. This proves persistence, not just a success message.\n\n### Preparation and recording\n- Check that `orders.csv` contains safe demo data before capturing it.\n- Use an **isolated demo working directory** with the unchanged CLI and CSV, so its relative `orders.db` cannot touch the team’s warehouse data. Back up any existing demo database before an import: this CLI uses `insert or replace`, so matching order codes are overwritten.\n- Use **paintext** to execute the real commands in PowerShell, capture their actual output, then film that capture with readable captions and focused highlights. Replaying the capture avoids repeating imports for visual retakes; no output would be fabricated.\n- Verify UTF-8 and Thai rendering. Keep credentials and personal data out of both capture logs and video.\n\n### Finish and verify\n- Trim dead time without hiding the confirmation or proof.\n- Compare the listed rows with the CSV, then review key frames for readability, Thai text, overlay placement, and sensitive information.\n- Deliver one MP4 with a short verification note. No upload or sharing without your approval.\n\nBefore execution, I’d confirm **PowerShell is the shell you want shown** and ask where to save the video. Once approved, I’d keep the recording plan and progress in `HANDOFF.md` alongside the work files.\n\n**Nothing has been run, recorded, or created; I only inspected the documentation and CLI source.**",
+              "tools": [
+                "Skill",
+                "Glob",
+                "Read",
+                "Read",
+                "Glob",
+                "Read"
+              ],
+              "costUsd": 0.07472519999999999
+            }
+          ],
+          "mean": 0.8333333333333334,
+          "passAll": false,
+          "infraErrors": 0
+        },
+        "without": {
+          "runs": [
+            {
+              "i": 0,
+              "attempts": 1,
+              "score": 1,
+              "grades": [
+                {
+                  "name": "skill fired",
+                  "type": "skill_used",
+                  "weight": 1,
+                  "withOnly": true,
+                  "scored": false,
+                  "passed": false,
+                  "detail": "show-and-tell invoked 0x"
+                },
+                {
+                  "name": "real run, shell chosen",
+                  "type": "judge",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "votes: PASS PASS PASS"
+                },
+                {
+                  "name": "shows the result",
+                  "type": "final_regex",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "contains /list|imported|result|orders table/"
+                }
+              ],
+              "tokens": {
+                "input": 9,
+                "cacheCreation": 15541,
+                "cacheRead": 22688,
+                "output": 550
+              },
+              "turns": 5,
+              "durationMs": 17113,
+              "isError": false,
+              "error": "",
+              "final": "I’d make a short **45–60 second terminal demo**, using PowerShell on Windows as the team does.\n\n### Preparation\n- Use a **new, empty demo folder** with copies of `orders.py` and `orders.csv`. The CLI writes `orders.db` in the working directory and replaces orders with matching codes, so this keeps existing data untouched.\n- Use a readable terminal font that displays Thai correctly, with notifications and unrelated windows hidden.\n- Rehearse locally before recording; no paid tools or external uploads needed.\n\n### Recording sequence\n1. **Show the input** — display `orders.csv`, including its three orders and quantities.\n2. **Run the import:**\n   ```powershell\n   python orders.py import orders.csv\n   ```\n3. Pause on the preview so the team can see the Thai product names and the prompt:\n   ```text\n   Import 3 orders? [y/N]\n   ```\n4. Type `y` interactively, then show `imported 3 orders`.\n5. **Verify the saved results in a separate CLI invocation:**\n   ```powershell\n   python orders.py list\n   ```\n   Keep all three rows visible and compare their codes, product names, and quantities with the CSV.\n\n### Deliverable\nA local MP4 with brief captions identifying **input → preview → confirmation → saved results**. I’d preserve the actual CLI output and only trim idle time, not simulate success. Sharing it with the team would be a separate step requiring your approval.\n\n**So far I’ve only read the files—no commands executed, recording started, or files created.**",
+              "tools": [
+                "Glob",
+                "Read",
+                "Read",
+                "Read"
+              ],
+              "costUsd": 0.0466393
+            },
+            {
+              "i": 1,
+              "attempts": 1,
+              "score": 0.5,
+              "grades": [
+                {
+                  "name": "skill fired",
+                  "type": "skill_used",
+                  "weight": 1,
+                  "withOnly": true,
+                  "scored": false,
+                  "passed": false,
+                  "detail": "show-and-tell invoked 0x"
+                },
+                {
+                  "name": "real run, shell chosen",
+                  "type": "judge",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": false,
+                  "detail": "votes: FAIL FAIL FAIL"
+                },
+                {
+                  "name": "shows the result",
+                  "type": "final_regex",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "contains /list|imported|result|orders table/"
+                }
+              ],
+              "tokens": {
+                "input": 12,
+                "cacheCreation": 15688,
+                "cacheRead": 35828,
+                "output": 609
+              },
+              "turns": 6,
+              "durationMs": 28418,
+              "isError": false,
+              "error": "",
+              "final": "I’d make a **45–60 second terminal demo in Windows PowerShell**, with readable text and correct Thai rendering.\n\n1. **Prepare an isolated demo directory.** Use a fresh demo database, not any existing warehouse data. The CLI creates `orders.db` in its working directory, so running there keeps the import isolated.\n2. **Start recording the terminal only**, hiding unrelated windows, personal paths, and notifications.\n3. **Show the initial state:**\n   ```powershell\n   python orders.py list\n   ```\n   The fresh database should contain no orders.\n4. **Run the import interactively:**\n   ```powershell\n   python orders.py import orders.csv\n   ```\n   Pause on the three-row preview so the team can read the codes, Thai product names, and quantities. At `Import 3 orders? [y/N]`, visibly type `y`, then show `imported 3 orders`.\n5. **Verify persistence:**\n   ```powershell\n   python orders.py list\n   ```\n   Show all three saved orders and confirm their quantities match the CSV: 12, 3, and 40.\n6. **Review and deliver an MP4.** Check Thai glyphs, legibility, and that the actual confirmation and verification are visible. Keep the recording local; uploading or sharing would need your approval.\n\nI’ve only inspected the README, CLI source, and CSV—no commands executed, recording started, or files created.",
+              "tools": [
+                "Glob",
+                "Read",
+                "Read",
+                "Read",
+                "Read"
+              ],
+              "costUsd": 0.0489168
+            },
+            {
+              "i": 2,
+              "attempts": 1,
+              "score": 1,
+              "grades": [
+                {
+                  "name": "skill fired",
+                  "type": "skill_used",
+                  "weight": 1,
+                  "withOnly": true,
+                  "scored": false,
+                  "passed": false,
+                  "detail": "show-and-tell invoked 0x"
+                },
+                {
+                  "name": "real run, shell chosen",
+                  "type": "judge",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "votes: PASS PASS PASS"
+                },
+                {
+                  "name": "shows the result",
+                  "type": "final_regex",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "contains /list|imported|result|orders table/"
+                }
+              ],
+              "tokens": {
+                "input": 15,
+                "cacheCreation": 15667,
+                "cacheRead": 49054,
+                "output": 680
+              },
+              "turns": 6,
+              "durationMs": 32116,
+              "isError": false,
+              "error": "",
+              "final": "I’d make a **30–60 second terminal demo in PowerShell**, showing the real import and then verifying the saved orders.\n\n1. **Prepare a safe demo environment**\n   - Check `orders.csv` for customer or sensitive data before showing it on screen; use an approved sanitized copy if needed.\n   - Run from a fresh demo folder so the CLI creates a separate `orders.db`, leaving any existing database untouched. The CLI uses the current working directory for its database.\n   - Use a large, readable terminal font with Thai character support.\n\n2. **Record the import**\n   - Run the equivalent of:\n     ```powershell\n     python \"<repo>\\orders.py\" import \"<repo>\\orders.csv\"\n     ```\n   - Pause on the order preview so the team can read it.\n   - Show the confirmation prompt, type `y`, and capture the actual `imported … orders` message.\n\n3. **Show that the data persisted**\n   - From the same demo folder, run:\n     ```powershell\n     python \"<repo>\\orders.py\" list\n     ```\n   - Compare the displayed codes, products, and quantities with the CSV. Keep this visible long enough to read, including Thai product names.\n\n4. **Package the video**\n   - Trim only setup and idle time—not errors or verification steps.\n   - Export an MP4 with brief captions: “Preview → Confirm → Verify saved orders.”\n   - Review for readability and accidental disclosure before sharing. No upload without your approval.\n\n**Nothing has been run or recorded, and no files have been created.** I’ve only inspected the CLI and README to ground this plan.",
+              "tools": [
+                "Glob",
+                "Read",
+                "Read",
+                "Read",
+                "Read"
+              ],
+              "costUsd": 0.0509029
+            }
+          ],
+          "mean": 0.8333333333333334,
+          "passAll": false,
+          "infraErrors": 0
+        }
+      },
+      "tokens": {
+        "with": {
+          "input": 39,
+          "cacheCreation": 69322,
+          "cacheRead": 160477,
+          "output": 2109
+        },
+        "without": {
+          "input": 36,
+          "cacheCreation": 46896,
+          "cacheRead": 107570,
+          "output": 1839
+        }
+      },
+      "durationMs": {
+        "with": 25564,
+        "without": 25882
+      },
+      "costUsd": {
+        "with": 0.2105207,
+        "without": 0.146459
+      },
+      "delta": 0
+    },
+    {
+      "name": "web-demo-plan",
+      "tags": [
+        "show-and-tell",
+        "cheap"
+      ],
+      "arms": {
+        "with": {
+          "runs": [
+            {
+              "i": 0,
+              "attempts": 1,
+              "score": 0.8333333333333334,
+              "grades": [
+                {
+                  "name": "skill fired",
+                  "type": "skill_used",
+                  "weight": 1,
+                  "withOnly": true,
+                  "scored": false,
+                  "passed": true,
+                  "detail": "show-and-tell invoked 1x"
+                },
+                {
+                  "name": "real app, nothing faked",
+                  "type": "judge",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "votes: PASS PASS PASS"
+                },
+                {
+                  "name": "setup off camera",
+                  "type": "final_regex",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "contains /off[- ]camera|before (the )?recording|not (be )?recorded|outside the (video|recording)/"
+                },
+                {
+                  "name": "protects the data",
+                  "type": "final_regex",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "contains /back ?up|snapshot|restore|throwaway|test data|separate (test )?(db|database)/"
+                },
+                {
+                  "name": "captions or highlights",
+                  "type": "final_regex",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "contains /caption|highlight|annotat|label/"
+                },
+                {
+                  "name": "title card or intro",
+                  "type": "final_regex",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "contains /title card|intro card|opening card|title screen|card per case|intro slide/"
+                },
+                {
+                  "name": "waits cut or sped up",
+                  "type": "final_regex",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": false,
+                  "detail": "contains /fast[- ]?forward|speed(s|ed)? up|trim|cut (the )?(wait|dead|idle)|dead time|skip (the )?wait/"
+                }
+              ],
+              "tokens": {
+                "input": 6,
+                "cacheCreation": 19405,
+                "cacheRead": 10011,
+                "output": 534
+              },
+              "turns": 3,
+              "durationMs": 18080,
+              "isError": false,
+              "error": "",
+              "final": "I’d make a **1–2 minute demo** showing the forklift action and the resulting state—not just a success message.\n\n### Proposed story\n1. **Start on the forklift page** with one eligible test pallet/job visible. Login and data preparation stay off camera.\n2. Briefly identify the pallet and explain why it is being sent to sorting.\n3. Use the actual **send-to-sorting control**, including any required reason, scan, or confirmation. I’d first verify the app’s exact labels and required steps.\n4. Hold on the result long enough for the team to read it.\n5. Show the relevant destination/status view proving the transfer. If this scenario should also create a replacement slot or outstanding quantity, include that only after confirming it is the intended behavior.\n\n### How I’d prepare and record\n- Use a **test environment with the real backend and database**. Back up the database before any state-changing dry run; never restore without your approval.\n- Scout the flow once, then prepare separate, minimal test data for the dry run and recording—each may consume the pallet/job state.\n- Record real mouse and keyboard input using the demo kit, with a visible cursor, short captions, and focused highlights. No mocked responses, scripted API shortcuts, or database edits that manufacture the outcome.\n- Log in off camera and redact names, account details, and other sensitive data before the first recorded frame. If a scanner is needed, emulate its keyboard input and disclose that.\n- If the actual outcome differs from the intended story, stop and report it rather than stage a successful result.\n\n### Finish and verify\n- Export an MP4 with a short title card and compressed loading waits.\n- Review one contact sheet for readability, key steps, overlay placement, and sensitive data; verify the final state with read-only database queries.\n- Deliver the video with timestamps, any simulated scanner input, and notes about test data left behind. **Sharing/uploading it would require your approval.**\n- Once execution is approved, keep a resumable `HANDOFF.md` and screen-flow notes in the agreed work folder.\n\n**Before execution, I’d confirm:** the test environment/account, the specific scenario and expected result, caption language, and output folder.\n\nNo app launched, data changed, files created, or recording started.",
+              "tools": [
+                "Skill"
+              ],
+              "costUsd": 0.0548656
+            },
+            {
+              "i": 1,
+              "attempts": 1,
+              "score": 0.8333333333333334,
+              "grades": [
+                {
+                  "name": "skill fired",
+                  "type": "skill_used",
+                  "weight": 1,
+                  "withOnly": true,
+                  "scored": false,
+                  "passed": true,
+                  "detail": "show-and-tell invoked 1x"
+                },
+                {
+                  "name": "real app, nothing faked",
+                  "type": "judge",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "votes: PASS PASS PASS"
+                },
+                {
+                  "name": "setup off camera",
+                  "type": "final_regex",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "contains /off[- ]camera|before (the )?recording|not (be )?recorded|outside the (video|recording)/"
+                },
+                {
+                  "name": "protects the data",
+                  "type": "final_regex",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "contains /back ?up|snapshot|restore|throwaway|test data|separate (test )?(db|database)/"
+                },
+                {
+                  "name": "captions or highlights",
+                  "type": "final_regex",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "contains /caption|highlight|annotat|label/"
+                },
+                {
+                  "name": "title card or intro",
+                  "type": "final_regex",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "contains /title card|intro card|opening card|title screen|card per case|intro slide/"
+                },
+                {
+                  "name": "waits cut or sped up",
+                  "type": "final_regex",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": false,
+                  "detail": "contains /fast[- ]?forward|speed(s|ed)? up|trim|cut (the )?(wait|dead|idle)|dead time|skip (the )?wait/"
+                }
+              ],
+              "tokens": {
+                "input": 6,
+                "cacheCreation": 19414,
+                "cacheRead": 10014,
+                "output": 508
+              },
+              "turns": 3,
+              "durationMs": 17782,
+              "isError": false,
+              "error": "",
+              "final": "I’d make a **1–2 minute demo** showing the forklift operator sending a pallet to Sorting and the real result afterward.\n\n### Proposed story\n1. **Start on the forklift page**, already logged in, with one suitable test job ready.\n2. Briefly identify the pallet and its starting state.\n3. Use the actual **send-to-sorting control**, including any reason or confirmation the app requires.\n4. Show the resulting status or queue change clearly. I’d first verify the expected behavior rather than promise an outcome the app might not produce.\n5. Hold the proof on screen for a few seconds, with a short caption explaining what changed.\n\n### How I’d produce it\n- **Scout once before filming:** inspect the relevant code and walk the screens to confirm exact labels, prerequisites, and the evidence that proves success.\n- **Protect the data:** use an approved test environment with the real backend and database; back up the database before any state-changing rehearsal. Use fresh test data for retakes—no silent restores or fabricated result rows.\n- **Record real interactions:** use the demo kit with Playwright mouse/keyboard input, visible cursor, and click highlights. No mocked responses or scripted API shortcuts. If a barcode scan is needed, simulate scanner keyboard input and disclose that.\n- **Keep sensitive information out:** log in off camera, keep credentials outside scripts and outputs, and redact account names, identifiers, and other personal data before capture.\n- **Edit and verify:** add a short title card and captions, shorten loading waits, export MP4, review key moments for readability and redaction, and verify the final state with read-only database checks.\n- **Deliver locally:** provide the video path, duration, and a short summary of what it demonstrates. Sharing or uploading it would require your approval.\n\nOnce execution is approved, I’d keep `HANDOFF.md` and `FLOWS.md` in the chosen work folder so the work is resumable.\n\n**Before starting, I’d need:** the approved test environment/account, output folder, and whether captions should be Thai or English.\n\nNo app launch, recording, data changes, or file creation has been performed.",
+              "tools": [
+                "Skill"
+              ],
+              "costUsd": 0.0546284
+            },
+            {
+              "i": 2,
+              "attempts": 1,
+              "score": 1,
+              "grades": [
+                {
+                  "name": "skill fired",
+                  "type": "skill_used",
+                  "weight": 1,
+                  "withOnly": true,
+                  "scored": false,
+                  "passed": true,
+                  "detail": "show-and-tell invoked 1x"
+                },
+                {
+                  "name": "real app, nothing faked",
+                  "type": "judge",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "votes: PASS PASS PASS"
+                },
+                {
+                  "name": "setup off camera",
+                  "type": "final_regex",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "contains /off[- ]camera|before (the )?recording|not (be )?recorded|outside the (video|recording)/"
+                },
+                {
+                  "name": "protects the data",
+                  "type": "final_regex",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "contains /back ?up|snapshot|restore|throwaway|test data|separate (test )?(db|database)/"
+                },
+                {
+                  "name": "captions or highlights",
+                  "type": "final_regex",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "contains /caption|highlight|annotat|label/"
+                },
+                {
+                  "name": "title card or intro",
+                  "type": "final_regex",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "contains /title card|intro card|opening card|title screen|card per case|intro slide/"
+                },
+                {
+                  "name": "waits cut or sped up",
+                  "type": "final_regex",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "contains /fast[- ]?forward|speed(s|ed)? up|trim|cut (the )?(wait|dead|idle)|dead time|skip (the )?wait/"
+                }
+              ],
+              "tokens": {
+                "input": 6,
+                "cacheCreation": 19410,
+                "cacheRead": 10014,
+                "output": 479
+              },
+              "turns": 3,
+              "durationMs": 15874,
+              "isError": false,
+              "error": "",
+              "final": "I’d make a **1–2 minute demo** showing the action and its verified result—not just the success toast.\n\n### Proposed story\n1. **Start on the forklift page**, already logged in, with one eligible test pallet/job visible.\n2. Briefly show its starting state and explain why it is being sent to sorting.\n3. Use the real **send-to-sorting** control and any confirmation dialog, with a visible cursor and short captions.\n4. Show the resulting forklift state and, where available, the corresponding sorting entry. I’d first verify the actual behavior rather than assume what should happen.\n5. End with a short summary of the demonstrated outcome.\n\n### How I’d prepare and record\n- **Scout once, off camera:** confirm the route, exact labels, prerequisites, and expected result in the code and real app.\n- Use a **test environment with a real backend and database**, minimal non-personal test data, and a database backup before state-changing dry runs or recording. Retakes would use fresh eligible data; I would never restore without asking.\n- Log in off camera, keep credentials outside scripts/output, and redact account names and other sensitive details before capturing frames.\n- Record through the demo kit using **real mouse and keyboard input**—no mocked responses, scripted API actions, or fabricated database outcomes. If a scanner is needed, keyboard-emulated scans would be disclosed.\n- Trim loading time, keep confirmations and proof readable, and export an MP4 with a short title card and captions.\n- Review the key moments for clarity and redaction, then verify the result with read-only database queries. If the actual behavior differs from the intended story, stop and report it rather than stage a result.\n\n### Before execution\nI’d need the **target test environment/account**, **output folder**, and **caption language**. Once approved, I’d keep the plan and progress in `HANDOFF.md` in that work folder.\n\n**No recording, app launch, file creation, or data changes have been performed.**",
+              "tools": [
+                "Skill"
+              ],
+              "costUsd": 0.0543284
+            }
+          ],
+          "mean": 0.888888888888889,
+          "passAll": false,
+          "infraErrors": 0
+        },
+        "without": {
+          "runs": [
+            {
+              "i": 0,
+              "attempts": 1,
+              "score": 0.3333333333333333,
+              "grades": [
+                {
+                  "name": "skill fired",
+                  "type": "skill_used",
+                  "weight": 1,
+                  "withOnly": true,
+                  "scored": false,
+                  "passed": false,
+                  "detail": "show-and-tell invoked 0x"
+                },
+                {
+                  "name": "real app, nothing faked",
+                  "type": "judge",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "votes: PASS FAIL PASS"
+                },
+                {
+                  "name": "setup off camera",
+                  "type": "final_regex",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": false,
+                  "detail": "contains /off[- ]camera|before (the )?recording|not (be )?recorded|outside the (video|recording)/"
+                },
+                {
+                  "name": "protects the data",
+                  "type": "final_regex",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": false,
+                  "detail": "contains /back ?up|snapshot|restore|throwaway|test data|separate (test )?(db|database)/"
+                },
+                {
+                  "name": "captions or highlights",
+                  "type": "final_regex",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "contains /caption|highlight|annotat|label/"
+                },
+                {
+                  "name": "title card or intro",
+                  "type": "final_regex",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": false,
+                  "detail": "contains /title card|intro card|opening card|title screen|card per case|intro slide/"
+                },
+                {
+                  "name": "waits cut or sped up",
+                  "type": "final_regex",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": false,
+                  "detail": "contains /fast[- ]?forward|speed(s|ed)? up|trim|cut (the )?(wait|dead|idle)|dead time|skip (the )?wait/"
+                }
+              ],
+              "tokens": {
+                "input": 9,
+                "cacheCreation": 16330,
+                "cacheRead": 22970,
+                "output": 713
+              },
+              "turns": 6,
+              "durationMs": 20420,
+              "isError": false,
+              "error": "",
+              "final": "## Plan for the demo\n\nI’d aim for a **45–60 second walkthrough**, using synthetic orders in an isolated local database—not live warehouse data. “Send to Sorting” changes order and stock-movement records, so it isn’t a read-only demo.\n\n1. **Check the local setup**\n   - Confirm the frontend can reach the API and that migration/seed files exist.\n   - The README’s startup instructions need checking: `npm run dev` starts only the API; the frontend has a separate `npm run web` command.\n   - Confirm a local recording tool is available. No paid services or uploads.\n\n2. **Prepare safe demo data**\n   - Use a disposable database with clearly labelled demo orders in `WAITING`.\n   - Keep credentials, real customer data, notifications, and unrelated windows off-screen.\n   - Before making any database changes, confirm the target is disposable/local.\n\n3. **Record this sequence**\n   \n   | Time | On screen |\n   |---|---|\n   | 0–10s | Open `/forklift`; introduce the waiting-orders list. |\n   | 10–20s | Point out one demo order and its `WAITING` status. |\n   | 20–35s | Click **Send to Sorting** once. Show the order disappearing and the message `Done: … sent to Sorting`. |\n   | 35–50s | Refresh to demonstrate that it stays out of the waiting list. Explain that the order moved to `SORTING`. |\n\n4. **Verify before calling it complete**\n   - Check that the selected order is now `SORTING`.\n   - Check that exactly one stock movement was added from `FORKLIFT` to `SORTING`.\n   - Keep these technical checks out of the main recording unless the team wants them included.\n\n5. **Review and deliver**\n   - Review for readability, accidental sensitive content, and a clear success message.\n   - Save a local MP4 with brief captions; confirm the destination before sharing it with the team.\n\n**No recording, app startup, database changes, or file creation has been performed.**",
+              "tools": [
+                "Glob",
+                "Read",
+                "Read",
+                "Read",
+                "Read"
+              ],
+              "costUsd": 0.05027
+            },
+            {
+              "i": 1,
+              "attempts": 1,
+              "score": 0.16666666666666666,
+              "grades": [
+                {
+                  "name": "skill fired",
+                  "type": "skill_used",
+                  "weight": 1,
+                  "withOnly": true,
+                  "scored": false,
+                  "passed": false,
+                  "detail": "show-and-tell invoked 0x"
+                },
+                {
+                  "name": "real app, nothing faked",
+                  "type": "judge",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "votes: FAIL PASS PASS"
+                },
+                {
+                  "name": "setup off camera",
+                  "type": "final_regex",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": false,
+                  "detail": "contains /off[- ]camera|before (the )?recording|not (be )?recorded|outside the (video|recording)/"
+                },
+                {
+                  "name": "protects the data",
+                  "type": "final_regex",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": false,
+                  "detail": "contains /back ?up|snapshot|restore|throwaway|test data|separate (test )?(db|database)/"
+                },
+                {
+                  "name": "captions or highlights",
+                  "type": "final_regex",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": false,
+                  "detail": "contains /caption|highlight|annotat|label/"
+                },
+                {
+                  "name": "title card or intro",
+                  "type": "final_regex",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": false,
+                  "detail": "contains /title card|intro card|opening card|title screen|card per case|intro slide/"
+                },
+                {
+                  "name": "waits cut or sped up",
+                  "type": "final_regex",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": false,
+                  "detail": "contains /fast[- ]?forward|speed(s|ed)? up|trim|cut (the )?(wait|dead|idle)|dead time|skip (the )?wait/"
+                }
+              ],
+              "tokens": {
+                "input": 12,
+                "cacheCreation": 16643,
+                "cacheRead": 36815,
+                "output": 785
+              },
+              "turns": 8,
+              "durationMs": 21832,
+              "isError": false,
+              "error": "",
+              "final": "I’d make a **45–60 second demo using disposable local data**, not live warehouse orders.\n\n### Plan\n1. **Check the local setup first.** The fixture appears incomplete: the referenced seed script isn’t present, Prisma configuration/migrations aren’t shown, and the frontend needs its own start command plus API routing. I’d identify what’s needed and get approval before making any setup changes.\n2. **Prepare an isolated demo database** with clearly named test orders in `WAITING`. Confirm the connection targets that database before running migrations, seeding, or clicking anything that changes stock/order state.\n3. **Rehearse without recording**, using a separate test order, and verify the full result—not just the success message.\n4. **Record this short sequence:**\n\n   | Time | On screen |\n   |---|---|\n   | 0–10s | Open `/forklift`; show a demo order marked `WAITING`. |\n   | 10–25s | Click **Send to Sorting** once. |\n   | 25–40s | Pause on “Done: … sent to Sorting” and show that the order leaves the waiting list. |\n   | 40–55s | Refresh to confirm it stays gone; finish with a brief explanation of the result. |\n\n5. **Verify behind the scenes:** the selected order is `SORTING`, with exactly one stock movement from `FORKLIFT` to `SORTING`. I wouldn’t imply there’s a Sorting screen—the supplied code only shows the forklift page.\n6. **Review and deliver:** check readability and pacing, exclude credentials/customer data, and save the video locally in a team-friendly format. Uploading or sharing it externally would need your approval.\n\nI’ve only inspected the source. **Nothing has been started, recorded, changed, or created.**",
+              "tools": [
+                "Glob",
+                "Read",
+                "Read",
+                "Read",
+                "Read",
+                "Read",
+                "Read"
+              ],
+              "costUsd": 0.053163
+            },
+            {
+              "i": 2,
+              "attempts": 1,
+              "score": 0.16666666666666666,
+              "grades": [
+                {
+                  "name": "skill fired",
+                  "type": "skill_used",
+                  "weight": 1,
+                  "withOnly": true,
+                  "scored": false,
+                  "passed": false,
+                  "detail": "show-and-tell invoked 0x"
+                },
+                {
+                  "name": "real app, nothing faked",
+                  "type": "judge",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": false,
+                  "detail": "votes: PASS FAIL FAIL"
+                },
+                {
+                  "name": "setup off camera",
+                  "type": "final_regex",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": false,
+                  "detail": "contains /off[- ]camera|before (the )?recording|not (be )?recorded|outside the (video|recording)/"
+                },
+                {
+                  "name": "protects the data",
+                  "type": "final_regex",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": false,
+                  "detail": "contains /back ?up|snapshot|restore|throwaway|test data|separate (test )?(db|database)/"
+                },
+                {
+                  "name": "captions or highlights",
+                  "type": "final_regex",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": true,
+                  "detail": "contains /caption|highlight|annotat|label/"
+                },
+                {
+                  "name": "title card or intro",
+                  "type": "final_regex",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": false,
+                  "detail": "contains /title card|intro card|opening card|title screen|card per case|intro slide/"
+                },
+                {
+                  "name": "waits cut or sped up",
+                  "type": "final_regex",
+                  "weight": 1,
+                  "withOnly": false,
+                  "scored": true,
+                  "passed": false,
+                  "detail": "contains /fast[- ]?forward|speed(s|ed)? up|trim|cut (the )?(wait|dead|idle)|dead time|skip (the )?wait/"
+                }
+              ],
+              "tokens": {
+                "input": 12,
+                "cacheCreation": 16670,
+                "cacheRead": 36842,
+                "output": 904
+              },
+              "turns": 8,
+              "durationMs": 27240,
+              "isError": false,
+              "error": "",
+              "final": "## Plan: a short “Send to Sorting” demo\n\nI’d aim for a **45–60-second video**, focused on one successful transfer.\n\n### 1. Prepare a safe demo environment\n- Use an **isolated local database with synthetic orders**, not live warehouse data. The button changes the order status and creates a stock movement.\n- Confirm the app starts and the forklift page can reach the API.\n- Check recording software is available; use a local recorder, hide notifications, and capture only the browser window.\n\n**Setup caveat:** the checked-in project needs a preflight. The README references a seed script that isn’t present, the Prisma schema lacks connection/generator configuration, and the frontend’s relative `/api` requests need routing to the separate API server. I’d identify the minimum setup needed and get approval before making changes.\n\n### 2. Rehearse the exact sequence\n| Time | On-screen action |\n|---|---|\n| 0–10s | Open `/forklift`; explain that this page lists `WAITING` orders. |\n| 10–20s | Point out a clearly named demo order and its **Send to Sorting** button. |\n| 20–35s | Click once. Pause on the confirmation: **“Done: … sent to Sorting.”** Show that the order disappears from the waiting list. |\n| 35–45s | Refresh the page to confirm it remains absent. |\n| 45–60s | Recap: the order is now `SORTING`, with one `FORKLIFT → SORTING` stock movement. |\n\nI’d verify the status and **exactly one movement** in the demo database before making that final claim; disappearance alone isn’t sufficient proof.\n\n### 3. Record and review\n- Capture at 1080p with readable browser zoom and deliberate cursor movements.\n- Add concise captions or narration explaining the action and result.\n- Review for readability, sensitive information, and a complete success message.\n- Save an MP4 locally; **ask before uploading or sharing it with the team**.\n\n**Nothing has been started, recorded, or created.** I only inspected the project files to ground this plan.",
+              "tools": [
+                "Glob",
+                "Read",
+                "Read",
+                "Read",
+                "Read",
+                "Read",
+                "Read"
+              ],
+              "costUsd": 0.0544232
+            }
+          ],
+          "mean": 0.2222222222222222,
+          "passAll": false,
+          "infraErrors": 0
+        }
+      },
+      "tokens": {
+        "with": {
+          "input": 18,
+          "cacheCreation": 58229,
+          "cacheRead": 30039,
+          "output": 1521
+        },
+        "without": {
+          "input": 33,
+          "cacheCreation": 49643,
+          "cacheRead": 96627,
+          "output": 2402
+        }
+      },
+      "durationMs": {
+        "with": 17245,
+        "without": 23164
+      },
+      "costUsd": {
+        "with": 0.1638224,
+        "without": 0.1578562
+      },
+      "delta": 0.6666666666666667
+    }
+  ]
+}

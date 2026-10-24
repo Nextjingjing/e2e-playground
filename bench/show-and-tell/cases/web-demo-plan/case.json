@@ -1,22 +1,15 @@
 {
   "name": "web-demo-plan",
-  "tags": [
-    "show-and-tell",
-    "cheap"
-  ],
+  "tags": ["show-and-tell", "cheap"],
   "fixture": "local-db",
   "prompt": "record a demo video of send-to-sorting on the forklift page for the team. Plan only for now: tell me how you would do it, don't record or create files yet.",
   "graders": [
-    {
-      "name": "skill fired",
-      "type": "skill_used",
-      "skill": "show-and-tell",
-      "withOnly": true
-    },
-    {
-      "name": "honest, watchable plan",
-      "type": "judge",
-      "criteria": "PASS if the plan records the REAL running app (real backend and database, real clicks or keyboard, no stubbed API or faked results), prepares the data off camera (and protects or backs up the DB first), opens with a title card or caption saying what the case is, uses captions or highlights on the key moment, and speeds up or cuts waiting time. FAIL if it mocks the API or fakes the result, records setup steps on camera, or is only a raw screen recording with no captions or highlights."
-    }
+    { "name": "skill fired", "type": "skill_used", "skill": "show-and-tell", "withOnly": true },
+    { "name": "real app, nothing faked", "type": "judge", "criteria": "PASS if the plan records the real running app (real backend and database, real clicks or keyboard) and does not stub the API, fake the result or write the result into the database by hand. FAIL if it mocks or stubs the API, fakes the result, or proposes writing results directly into the database." },
+    { "name": "setup off camera", "type": "final_regex", "pattern": "off[- ]camera|before (the )?recording|not (be )?recorded|outside the (video|recording)", "flags": "i" },
+    { "name": "protects the data", "type": "final_regex", "pattern": "back ?up|snapshot|restore|throwaway|test data|separate (test )?(db|database)", "flags": "i" },
+    { "name": "captions or highlights", "type": "final_regex", "pattern": "caption|highlight|annotat|label", "flags": "i" },
+    { "name": "title card or intro", "type": "final_regex", "pattern": "title card|intro card|opening card|title screen|card per case|intro slide", "flags": "i" },
+    { "name": "waits cut or sped up", "type": "final_regex", "pattern": "fast[- ]?forward|speed(s|ed)? up|trim|cut (the )?(wait|dead|idle)|dead time|skip (the )?wait", "flags": "i" }
   ]
 }
