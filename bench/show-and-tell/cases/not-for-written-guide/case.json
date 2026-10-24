@@ -1,0 +1,28 @@
+{
+  "name": "not-for-written-guide",
+  "tags": [
+    "show-and-tell",
+    "cheap",
+    "trigger"
+  ],
+  "arms": [
+    "with"
+  ],
+  "fixture": "local-db",
+  "prompt": "write step by step test instructions with screenshots that a new QA person can follow to check send-to-sorting. Plan only for now: tell me how you would do it, don't record or create files yet.",
+  "graders": [
+    {
+      "name": "show-and-tell does not fire",
+      "type": "tool_used",
+      "tool": "Skill",
+      "input": "show-and-tell",
+      "min": 0,
+      "max": 0
+    },
+    {
+      "name": "hold-my-hand fires",
+      "type": "skill_used",
+      "skill": "hold-my-hand"
+    }
+  ]
+}

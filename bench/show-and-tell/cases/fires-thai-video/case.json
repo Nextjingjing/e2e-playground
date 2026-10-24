@@ -1,0 +1,27 @@
+{
+  "name": "fires-thai-video",
+  "tags": [
+    "show-and-tell",
+    "cheap",
+    "trigger"
+  ],
+  "arms": [
+    "with"
+  ],
+  "fixture": "local-db",
+  "prompt": "อัดวิดีโอให้ทีมดูหน่อยว่าปุ่ม Send to Sorting ในหน้า Forklift ใช้ได้จริง Plan only for now: tell me how you would do it, don't record or create files yet.",
+  "graders": [
+    {
+      "name": "skill fired",
+      "type": "skill_used",
+      "skill": "show-and-tell"
+    },
+    {
+      "name": "no files written",
+      "type": "tool_used",
+      "tool": "Write",
+      "min": 0,
+      "max": 0
+    }
+  ]
+}

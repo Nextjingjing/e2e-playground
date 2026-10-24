@@ -1,0 +1,27 @@
+{
+  "name": "fires-bug-for-qa",
+  "tags": [
+    "show-and-tell",
+    "cheap",
+    "trigger"
+  ],
+  "arms": [
+    "with"
+  ],
+  "fixture": "local-db",
+  "prompt": "QA can't reproduce the double stock movement when you click Send to Sorting twice fast. capture it happening so they can watch it. Plan only for now: tell me how you would do it, don't record or create files yet.",
+  "graders": [
+    {
+      "name": "skill fired",
+      "type": "skill_used",
+      "skill": "show-and-tell"
+    },
+    {
+      "name": "no files written",
+      "type": "tool_used",
+      "tool": "Write",
+      "min": 0,
+      "max": 0
+    }
+  ]
+}

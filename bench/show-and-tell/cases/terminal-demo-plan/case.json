@@ -1,0 +1,28 @@
+{
+  "name": "terminal-demo-plan",
+  "tags": [
+    "show-and-tell",
+    "cheap"
+  ],
+  "fixture": "orders-cli",
+  "prompt": "make a demo video of importing orders.csv with the cli so the team sees it works. Plan only for now: tell me how you would do it, don't record or create files yet.",
+  "graders": [
+    {
+      "name": "skill fired",
+      "type": "skill_used",
+      "skill": "show-and-tell",
+      "withOnly": true
+    },
+    {
+      "name": "real run, shell chosen",
+      "type": "judge",
+      "criteria": "PASS if the plan runs the real CLI command (including answering the [y/N] prompt) and turns that real run into the video, and either asks the user which shell or terminal the video should show (PowerShell, cmd, bash...) or says it will use PowerShell because the team uses it. FAIL if it types fake output, edits the result, or skips the confirmation prompt."
+    },
+    {
+      "name": "shows the result",
+      "type": "final_regex",
+      "pattern": "list|imported|result|orders table",
+      "flags": "i"
+    }
+  ]
+}

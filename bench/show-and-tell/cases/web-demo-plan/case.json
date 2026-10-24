@@ -1,0 +1,22 @@
+{
+  "name": "web-demo-plan",
+  "tags": [
+    "show-and-tell",
+    "cheap"
+  ],
+  "fixture": "local-db",
+  "prompt": "record a demo video of send-to-sorting on the forklift page for the team. Plan only for now: tell me how you would do it, don't record or create files yet.",
+  "graders": [
+    {
+      "name": "skill fired",
+      "type": "skill_used",
+      "skill": "show-and-tell",
+      "withOnly": true
+    },
+    {
+      "name": "honest, watchable plan",
+      "type": "judge",
+      "criteria": "PASS if the plan records the REAL running app (real backend and database, real clicks or keyboard, no stubbed API or faked results), prepares the data off camera (and protects or backs up the DB first), opens with a title card or caption saying what the case is, uses captions or highlights on the key moment, and speeds up or cuts waiting time. FAIL if it mocks the API or fakes the result, records setup steps on camera, or is only a raw screen recording with no captions or highlights."
+    }
+  ]
+}

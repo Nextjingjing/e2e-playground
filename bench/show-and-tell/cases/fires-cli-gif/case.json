@@ -1,0 +1,27 @@
+{
+  "name": "fires-cli-gif",
+  "tags": [
+    "show-and-tell",
+    "cheap",
+    "trigger"
+  ],
+  "arms": [
+    "with"
+  ],
+  "fixture": "orders-cli",
+  "prompt": "make a short clip for the README showing the csv import working, prompt and all. Plan only for now: tell me how you would do it, don't record or create files yet.",
+  "graders": [
+    {
+      "name": "skill fired",
+      "type": "skill_used",
+      "skill": "show-and-tell"
+    },
+    {
+      "name": "no files written",
+      "type": "tool_used",
+      "tool": "Write",
+      "min": 0,
+      "max": 0
+    }
+  ]
+}

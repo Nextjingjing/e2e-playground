@@ -43,7 +43,8 @@ export async function runSuite(o) {
   const usage0 = await o.usage();
   const results = cases.map(c => ({ name: c.name, tags: c.tags, arms: Object.fromEntries(o.arms.map(a => [a, { runs: [] }])) }));
   const jobs = [];
-  cases.forEach((c, ci) => { for (const arm of o.arms) for (let i = 0; i < (o.runs || c.runs); i++) jobs.push({ c, ci, arm, i }); });
+  // a case may run in fewer arms, e.g. "does the skill fire?" cases only make sense with the plugin
+  cases.forEach((c, ci) => { for (const arm of o.arms.filter(a => !c.arms || c.arms.includes(a))) for (let i = 0; i < (o.runs || c.runs); i++) jobs.push({ c, ci, arm, i }); });
 
   await pool(jobs, o.concurrency, async ({ c, ci, arm, i }) => {
     const slot = results[ci].arms[arm].runs;

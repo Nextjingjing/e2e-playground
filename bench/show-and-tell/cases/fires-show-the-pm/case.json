@@ -1,0 +1,27 @@
+{
+  "name": "fires-show-the-pm",
+  "tags": [
+    "show-and-tell",
+    "cheap",
+    "trigger"
+  ],
+  "arms": [
+    "with"
+  ],
+  "fixture": "local-db",
+  "prompt": "the PM doesn't believe send-to-sorting is fixed. I need something I can show them in Friday's review that proves it works on the real system, start to finish. Plan only for now: tell me how you would do it, don't record or create files yet.",
+  "graders": [
+    {
+      "name": "skill fired",
+      "type": "skill_used",
+      "skill": "show-and-tell"
+    },
+    {
+      "name": "no files written",
+      "type": "tool_used",
+      "tool": "Write",
+      "min": 0,
+      "max": 0
+    }
+  ]
+}

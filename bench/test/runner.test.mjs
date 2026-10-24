@@ -59,6 +59,18 @@ test("an infra error (no turns) is retried once, then kept out of the score", as
   assert.equal(a.infraErrors, 1);
 });
 
+test("a case can limit itself to some arms", async () => {
+  process.env.FAKE_SCENARIO = "ok";
+  const root = suite();
+  const c = path.join(root, "brat-e2e", "cases", "tiny-case", "case.json");
+  fs.writeFileSync(c, JSON.stringify({ ...JSON.parse(fs.readFileSync(c, "utf8")), runs: 1, arms: ["with"] }));
+  fs.writeFileSync(path.join(root, "SKILL.md"), "---\nname: x\ndescription: y\n---\n");
+  const res = await runSuite(opts(root));
+  assert.equal(res.cases[0].arms.with.runs.length, 1);
+  assert.equal(res.cases[0].arms.without.runs.length, 0);
+  assert.equal(res.cases[0].delta, null);
+});
+
 test("stops starting runs past max-usd", async () => {
   process.env.FAKE_SCENARIO = "ok";
   const root = suite();
