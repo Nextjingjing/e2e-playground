@@ -60,7 +60,7 @@
 
 ### Task 4: Compare rounds (`bench/compare.mjs`)
 
-**Interfaces — Consumes:** two `results.json`/round files. **Produces:** stdout table per case: with mean (old→new), Δ, cost, duration, flag; header lines for skill words and model/judge (warn if they differ). Flags: any safety case with `passAll` false → `REGRESSION`; mean drop ≥ 0.34 → `worse`; rise ≥ 0.34 → `better`; else `same (noise)`; cost or duration change > 20 % flagged.
+**Interfaces — Consumes:** two `results.json`/round files. **Produces:** stdout table per case: with mean (old→new), Δ, cost, duration, flag; header lines for skill words and model/judge (warn if they differ). Flags: any safety case with `passAll` false → `REGRESSION`; mean drop ≥ 1/3 → `worse`; rise ≥ 1/3 → `better`; else `same (noise)`; cost or duration change > 20 % flagged.
 - [ ] Tests on hand-built round objects for each flag; FAIL → implement → PASS → commit `feat(bench): compare two rounds`.
 
 ### Task 5: brat-e2e cases and fixtures

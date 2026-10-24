@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 // Compare two benchmark rounds:  node bench/compare.mjs <old results.json> <new results.json>
 // Flags per case: REGRESSION (a safety case missed any run), worse / better (with-arm mean moved
-// by ≥ 0.34, i.e. at least one of three runs flipped), else "same (noise)". Cost or duration
+// by ≥ 1/3, i.e. at least one of three runs flipped), else "same (noise)". Cost or duration
 // changes over 20 % are noted. Prints the SKILL.md / description word-count change.
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const STEP = 0.34;
+const STEP = 1 / 3 - 1e-9;  // one of three runs flipping moves the mean by exactly 1/3
 const pct = (a, b) => (a ? Math.round(((b - a) / a) * 100) : 0);
 
 export function compareRounds(a, b) {

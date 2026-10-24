@@ -6,9 +6,9 @@ const round = (extra = {}) => ({ commit: "a", model: "m", judge: "j", effort: "m
 const kase = (name, mean, extra = {}) => ({ name, tags: [], arms: { with: { mean, passAll: mean === 1 }, without: { mean: 0.5 } }, delta: mean - 0.5,
   costUsd: { with: 0.1 }, durationMs: { with: 30000 }, ...extra });
 
-test("flags worse, better and noise by the 0.34 rule", () => {
-  const a = { round: round(), cases: [kase("x", 1), kase("y", 0.33), kase("z", 0.67)] };
-  const b = { round: round({ commit: "b" }), cases: [kase("x", 0.67), kase("y", 0.67), kase("z", 0.67)] };
+test("flags worse, better and noise by the one-run-in-three rule", () => {
+  const a = { round: round(), cases: [kase("x", 1), kase("y", 1 / 3), kase("z", 2 / 3)] };
+  const b = { round: round({ commit: "b" }), cases: [kase("x", 2 / 3), kase("y", 2 / 3), kase("z", 2 / 3)] };
   const rows = compareRounds(a, b).rows;
   assert.equal(rows.find(r => r.name === "x").flag, "worse");
   assert.equal(rows.find(r => r.name === "y").flag, "better");
