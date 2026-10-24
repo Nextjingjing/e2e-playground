@@ -1,0 +1,9 @@
+{
+  "name": "e2e-playground-bench",
+  "private": true,
+  "type": "module",
+  "description": "Benchmark for the e2e-playground skills: quality, time, tokens/cost and skill size per round",
+  "scripts": {
+    "test": "node --test --test-concurrency=1 \"test/*.test.mjs\""
+  }
+}
