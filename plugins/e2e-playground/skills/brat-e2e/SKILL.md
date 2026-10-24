@@ -1,6 +1,6 @@
 ---
 name: brat-e2e
-description: Write reliable automated end-to-end tests (Playwright for web/Electron, bats-core for CLIs, pywinauto for Windows desktop, Maestro for mobile, Playwright request/pytest for APIs) that run the real backend on a throwaway test database and don't flake. Use whenever the user asks to test a feature or flow automatically, "write e2e", "add a Playwright test", "test this CLI", "how do we make sure this keeps working", "ทำ e2e", "เขียนเทสต์ให้หน้านี้", or after building a feature that needs an automated check — even if they don't say which test tool to use.
+description: Use for ANY request to write, plan, review or fix end-to-end / e2e / Playwright / browser tests (even of logic that may belong in unit tests), any Playwright question (config, fixtures, storageState, retries, sharding, reports, flaky CI), "write e2e", "add a Playwright test", "test this CLI", "how do we make sure this keeps working", "ทำ e2e", "เขียนเทสต์ให้หน้านี้", or after building a feature that needs an automated check. Covers Playwright (web/Electron), bats-core (CLI), pywinauto (Windows), Maestro (mobile), API tests; real backend on a throwaway test DB, no flakes.
 ---
 
 # E2E tests that don't flake
@@ -59,7 +59,9 @@ database. Stub only what you don't control or can't make happen on purpose.
   1. start a separate throwaway test DB (e.g. `docker compose -f compose.e2e.yml up -d`, not the dev `db`), then real tests;
   2. mocked only (say what it won't prove);
   3. stop and set the environment up first.
-  Never offer a shared or production DB. If backend and a local DB start fine, don't ask.
+  Never offer a shared or production DB. If none of the four is true, don't ask about the
+  database: e.g. `.env` points at the local dev DB and Docker works → plan the separate `_e2e`
+  container and go on (asking before adding Playwright is still right).
 - **Mocked only**: say in the report it proves the UI against the API contract, not the
   backend, and name what would make it real.
 
