@@ -1,0 +1,5 @@
+{"ts":1761300000000,"ev":{"type":"system","subtype":"init","model":"claude-sonnet-5-5"}}
+{"ts":1761300001200,"ev":{"type":"assistant","message":{"id":"m1","content":[{"type":"text","text":"I will check the folder."}],"usage":{"input_tokens":12,"output_tokens":8}}}}
+{"ts":1761300002000,"ev":{"type":"assistant","message":{"id":"m2","content":[{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"echo ok"}}],"usage":{"input_tokens":20,"output_tokens":6}}}}
+{"ts":1761300003500,"ev":{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t1","content":"ok"}]}}}
+{"ts":1761300004000,"ev":{"type":"result","subtype":"success"}}
