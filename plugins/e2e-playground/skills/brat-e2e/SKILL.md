@@ -66,7 +66,7 @@ purpose. Pick for each test:
   here (Docker not installed, a VPN, a licence), or the configured database is not local
   (`.env` / config points at another host). Use AskUserQuestion in Claude Code; in other tools,
   a short numbered question. Offer exactly:
-  1. start a throwaway test DB (name the command, e.g. `docker compose up -d db`), then real tests;
+  1. start a throwaway test DB (name the command, e.g. `docker compose -f compose.e2e.yml up -d`), then real tests;
   2. mocked only (say what it won't prove);
   3. stop and set the environment up first.
   Never offer the shared or production database as a choice. When the backend and a local DB
@@ -76,9 +76,26 @@ purpose. Pick for each test:
   backend works. Name what would make it real.
 
 **Which database a real test may use.** Only a database the tests own and can wipe: a
-docker compose service, a CI service container, Testcontainers, or a database or schema
-created for this run. Use the same engine and major version as production (not SQLite or an
-in-memory stand-in for Postgres).
+container started for the tests, a CI service container, Testcontainers, or a database or
+schema created for this run. Use the same engine and major version as production (not SQLite
+or an in-memory stand-in for Postgres). A local dev database is **not** throwaway: the
+team's seeded data lives there, even on localhost.
+
+Give the tests their own container, apart from the dev one: a separate compose file with its
+own project name, its own port bound to 127.0.0.1, a database name ending in `_e2e`, and data
+in tmpfs so it vanishes on stop. Docker and Podman both run it (`docker compose -f …` /
+`podman compose -f …`): use whichever the machine has, and say which in the npm script.
+
+```yaml
+# compose.e2e.yml: throwaway DB for the e2e suite only
+name: app-e2e
+services:
+  db:
+    image: postgres:16            # same major as production
+    environment: { POSTGRES_PASSWORD: e2e, POSTGRES_DB: app_e2e }
+    ports: ["127.0.0.1:55432:5432"]
+    tmpfs: [/var/lib/postgresql/data]
+```
 
 **Never production, a shared dev or staging database, or one with real customer data.** This
 holds even when `.env` already points there and the user says it is faster. Tell them why in
@@ -86,17 +103,30 @@ one line: the tests write rows, would corrupt other people's data, and would fla
 activity. Then start the throwaway one. Make the suite refuse by itself:
 
 ```js
-// global-setup.js: the suite only runs against a throwaway local database
-module.exports = async () => {
-  const url = new URL(process.env.E2E_DATABASE_URL || "");
-  if (!["localhost", "127.0.0.1", "::1", "db"].includes(url.hostname))
-    throw new Error(`E2E refuses database host "${url.hostname}": start the test DB (docker compose up -d db)`);
-  // then: migrate (e.g. npx prisma migrate reset --force) with DATABASE_URL = E2E_DATABASE_URL
-};
+// e2e/test-db.js: called from playwright.config.js, so a wrong URL stops the run before anything starts
+function testDatabaseUrl() {
+  const raw = process.env.E2E_DATABASE_URL || "postgres://postgres:e2e@127.0.0.1:55432/app_e2e";
+  const url = new URL(raw), db = url.pathname.slice(1);
+  if (!["localhost", "127.0.0.1", "::1", "[::1]"].includes(url.hostname))
+    throw new Error(`E2E refuses database host "${url.hostname}": only a local throwaway DB`);
+  if (!/_e2e$/.test(db))   // a local dev DB passes the host check, so the name must mark it as a test DB
+    throw new Error(`E2E refuses database "${db}": the name must end in _e2e`);
+  return raw;
+}
+module.exports = { testDatabaseUrl };
 ```
 
-Start the backend for the tests with `webServer` in `playwright.config` and give it
-`DATABASE_URL: process.env.E2E_DATABASE_URL`, so the app and the tests use the same test DB.
+Before resetting (in global setup or the reset script), connect and check
+`select current_database()` ends in `_e2e` too, then reset and run the app's own migrations.
+
+Start the backend with `webServer` in `playwright.config` and pass it
+`env: { DATABASE_URL: testDatabaseUrl() }` (dotenv does not override a variable that is
+already set, so `.env` loses). **Playwright starts `webServer` before `globalSetup`**: if the
+reset runs in global setup, point `webServer.url` at a page that needs no tables, or reset
+and migrate in the `webServer.command` itself (`node e2e/reset-db.js && node server.js`).
+
+After the first green run, prove the right database was used: the test DB holds the rows the
+tests created, and the dev DB is unchanged.
 
 **Data in a real test.**
 - Create what each test needs before it runs, through the API (`request` fixture) or a
@@ -229,6 +259,11 @@ cover the negative cases (when the thing must *not* show) alongside the happy pa
 ## 7. Run, then report honestly
 
 - Run only the new spec first: `npx playwright test path/to/spec --reporter=list`.
+- Check it isn't flaky: `--repeat-each=5` on the new specs must pass every time.
+- Prove each real test can fail: break the behaviour it guards for a moment (skip the row
+  insert, return the wrong status), run it, see it go red, then restore the code with
+  `git checkout -- <file>` and see it green again. A test that stays green against broken code
+  proves nothing. Say in the report which break you tried.
 - If something fails, open the trace (`npx playwright show-trace ...`) before changing the
   test. Fix the test only when the test is wrong; if the app is wrong, report it.
 - Report pass/fail counts and run time, and which tests ran real (and on which test DB)
