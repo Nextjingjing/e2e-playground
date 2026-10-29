@@ -55,24 +55,25 @@ async function recordCard({ outDir, name, tag = "", title, lines = [], ms, view 
   fs.mkdirSync(outDir, { recursive: true });
   const rawDir = path.join(outDir, "_raw", name);
   const browser = await chromium.launch({ args: ["--force-device-scale-factor=1"] });
-  const context = await browser.newContext({ viewport: view, recordVideo: { dir: rawDir, size: view } });
-  const page = await context.newPage();
-  const t0 = Date.now();
-  const marks = [];
-  await page.setContent(cardHtml({ tag, title, lines, font, theme }));
-  await page.evaluate(() => document.fonts.ready);
-  marks.push({ t: (Date.now() - t0) / 1000, label: "start", kind: "start" });
-  await page.evaluate(() => document.getElementById("card").classList.add("on"));
-  await sleep(ms + 700);
-  await page.evaluate(() => document.getElementById("card").classList.remove("on"));
-  await sleep(800);
-  const video = page.video();
-  await context.close();
-  const dest = path.join(outDir, `${name}.webm`);
-  fs.copyFileSync(await video.path(), dest);
-  fs.writeFileSync(path.join(outDir, `${name}.marks.json`), JSON.stringify(marks, null, 2));
-  await browser.close();
-  return dest;
+  try {
+    const context = await browser.newContext({ viewport: view, recordVideo: { dir: rawDir, size: view } });
+    const page = await context.newPage();
+    const t0 = Date.now();
+    const marks = [];
+    await page.setContent(cardHtml({ tag, title, lines, font, theme }));
+    await page.evaluate(() => document.fonts.ready);
+    marks.push({ t: (Date.now() - t0) / 1000, label: "start", kind: "start" });
+    await page.evaluate(() => document.getElementById("card").classList.add("on"));
+    await sleep(ms + 700);
+    await page.evaluate(() => document.getElementById("card").classList.remove("on"));
+    await sleep(800);
+    const video = page.video();
+    await context.close();
+    const dest = path.join(outDir, `${name}.webm`);
+    fs.copyFileSync(await video.path(), dest);
+    fs.writeFileSync(path.join(outDir, `${name}.marks.json`), JSON.stringify(marks, null, 2));
+    return dest;
+  } finally { await browser.close().catch(() => {}); }
 }
 
 function esc(s) {
@@ -192,71 +193,80 @@ async function startSession(opts) {
   if (opts.electron) return startElectron(pw, opts, view, font);
   const { chromium } = pw;
   const browser = await chromium.launch({ args: ["--force-device-scale-factor=1"] });
-  // a step that throws must not leave Chromium running: Node would never exit
-  const guard = async fn => { try { return await fn(); } catch (e) { await browser.close().catch(() => {}); throw e; } };
+  try {
+    // a step that throws must not leave Chromium running: Node would never exit
+    const guard = async fn => { try { return await fn(); } catch (e) { await browser.close().catch(() => {}); throw e; } };
 
-  let storageState;
-  if (login) await guard(async () => {
-    storageState = opts.storageStatePath || path.join(outDir, "_auth-state.json");
-    const fresh = fs.existsSync(storageState) && Date.now() - fs.statSync(storageState).mtimeMs < 4 * 3600e3;
-    if (!fresh) {
-      const ctx = await browser.newContext({ viewport: view, baseURL });
-      const p = await ctx.newPage();
-      await login(p);
-      await ctx.storageState({ path: storageState });
-      await ctx.close();
+    let storageState;
+    if (login) await guard(async () => {
+      // Auth cookies/tokens must not become artifacts next to the video. An explicitly
+      // supplied existing state can still be read; new logins stay entirely in memory.
+      const existing = opts.storageStatePath;
+      const fresh = existing && fs.existsSync(existing) && Date.now() - fs.statSync(existing).mtimeMs < 4 * 3600e3;
+      if (fresh) storageState = existing;
+      else {
+        const ctx = await browser.newContext({ viewport: view, baseURL });
+        try {
+          const p = await ctx.newPage();
+          await login(p);
+          storageState = await ctx.storageState();
+        } finally { await ctx.close().catch(() => {}); }
+      }
+    });
+
+    const rawDir = path.join(outDir, "_raw", name);
+    const context = await browser.newContext({
+      viewport: view,
+      baseURL,
+      storageState,
+      permissions: ["clipboard-read", "clipboard-write"],
+      recordVideo: { dir: rawDir, size: view },
+      ...(opts.contextOptions || {}),
+    });
+    await context.addInitScript(overlayInit, font);
+    if (opts.captionPx) await context.addInitScript(sizeInit, opts.captionPx);
+    // credentials / personal data blurred before the first frame (opts.redact: false to turn off)
+    const redact = redactConfig(opts.redact ?? {});
+    if (redact) await context.addInitScript(redactInit, redact);
+    const page = await context.newPage();
+    page.on("console", m => { if (m.text().startsWith("[redact]")) console.warn(m.text()); });
+    const t0 = Date.now();
+    const marks = [];
+    const shots = [];
+    const demo = makeDemo(page, marks, t0, { view, font, theme: opts.theme, shots, shotDir: path.join(outDir, "shots", name) });
+
+    await guard(async () => {
+      if (startUrl) {
+        await demo.waitApp(async () => {
+          await page.goto(startUrl);
+          await page.waitForLoadState("networkidle").catch(() => {});
+        }, "open start page");
+      }
+      await page.evaluate(() => document.fonts.ready).catch(() => {});
+      if (opts.beforeStart) await opts.beforeStart(page); // e.g. load a terminal replay; trimmed off with the page load
+    });
+    demo.mark("start", "start"); // post.py trims everything before this
+
+    async function finish() {
+      await sleep(1200);
+      const video = page.video();
+      await context.close();
+      const dest = path.join(outDir, `${name}.webm`);
+      fs.copyFileSync(await video.path(), dest);
+      fs.writeFileSync(path.join(outDir, `${name}.marks.json`), JSON.stringify(marks, null, 2));
+      if (shots.length) {
+        const md = [`# ${name}`, ""];
+        for (const s of shots) md.push(`## ${s.n}. ${s.title}`, "", s.caption ? `${s.caption}\n` : "", `![${s.title}](${s.file})`, "");
+        fs.writeFileSync(path.join(outDir, "shots", name, "shots.md"), md.join("\n"));
+      }
+      await browser.close();
+      return dest;
     }
-  });
-
-  const rawDir = path.join(outDir, "_raw", name);
-  const context = await browser.newContext({
-    viewport: view,
-    baseURL,
-    storageState,
-    permissions: ["clipboard-read", "clipboard-write"],
-    recordVideo: { dir: rawDir, size: view },
-    ...(opts.contextOptions || {}),
-  });
-  await context.addInitScript(overlayInit, font);
-  if (opts.captionPx) await context.addInitScript(sizeInit, opts.captionPx);
-  // credentials / personal data blurred before the first frame (opts.redact: false to turn off)
-  const redact = redactConfig(opts.redact ?? {});
-  if (redact) await context.addInitScript(redactInit, redact);
-  const page = await context.newPage();
-  page.on("console", m => { if (m.text().startsWith("[redact]")) console.warn(m.text()); });
-  const t0 = Date.now();
-  const marks = [];
-  const shots = [];
-  const demo = makeDemo(page, marks, t0, { view, font, theme: opts.theme, shots, shotDir: path.join(outDir, "shots", name) });
-
-  await guard(async () => {
-    if (startUrl) {
-      await demo.waitApp(async () => {
-        await page.goto(startUrl);
-        await page.waitForLoadState("networkidle").catch(() => {});
-      }, "open start page");
-    }
-    await page.evaluate(() => document.fonts.ready).catch(() => {});
-    if (opts.beforeStart) await opts.beforeStart(page); // e.g. load a terminal replay; trimmed off with the page load
-  });
-  demo.mark("start", "start"); // post.py trims everything before this
-
-  async function finish() {
-    await sleep(1200);
-    const video = page.video();
-    await context.close();
-    const dest = path.join(outDir, `${name}.webm`);
-    fs.copyFileSync(await video.path(), dest);
-    fs.writeFileSync(path.join(outDir, `${name}.marks.json`), JSON.stringify(marks, null, 2));
-    if (shots.length) {
-      const md = [`# ${name}`, ""];
-      for (const s of shots) md.push(`## ${s.n}. ${s.title}`, "", s.caption ? `${s.caption}\n` : "", `![${s.title}](${s.file})`, "");
-      fs.writeFileSync(path.join(outDir, "shots", name, "shots.md"), md.join("\n"));
-    }
-    await browser.close();
-    return dest;
+    return { browser, context, page, demo, finish, shots };
+  } catch (error) {
+    await browser.close().catch(() => {});
+    throw error;
   }
-  return { browser, context, page, demo, finish, shots };
 }
 
 // Electron: same demo API on the app's first window. opts.electron = electron.launch options

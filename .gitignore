@@ -2,10 +2,16 @@ __pycache__/
 *.pyc
 node_modules/
 # demo-kit / post.py outputs if someone runs them inside the repo
+/demo-out/
 *.webm
 *.mp4
 *.marks.json
 *.review.json
+*.job.json
+*.job.json.lock
+*.job.json.*.tmp
+*.sheet.png
+*.work/
 _raw/
 _auth-state.json
 .DS_Store

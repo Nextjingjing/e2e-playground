@@ -49,8 +49,8 @@ the real shell echoed them while the capture typed them at human speed.
 
 **First ask which shell the video shows** (PowerShell, cmd, Git Bash / bash). Use a choice box
 if your tool has one. On Windows default to PowerShell. The capture runs in that shell, so
-the look always matches where the commands really ran. Record the answer in `HANDOFF.md` and
-`FLOWS.md`.
+the look always matches where the commands really ran. Record the shell in the case script;
+use shared `FLOWS.md` only when several workers need those facts.
 
 One-time setup: `cd <skill>/scripts/terminal && npm install` (pty, xterm.js, Playwright).
 Run `npm test` there to check the machine (Windows: about 5 min).

@@ -1,6 +1,9 @@
 """Finish demo-kit recordings: cut dead time, put the title card first, add music.
 
 usage:
+  python post.py finish <case.webm> <out.mp4> [--card card.webm] [--music] [--seed N]
+                     [--times t1 t2 ...] [--width 1280] [--force]
+                     # edit + one review sheet + resumable OUT.job.json; silent by default
   python post.py one <case.webm> <out.mp4> [--card card.webm] [--seed N]
                      [--idle-keep 0.6] [--freeze 2.5] [--freeze-keep 1.2] [--no-music]
   python post.py card <card.webm> <out.mp4> [--seed N]            # a title card on its own
@@ -19,11 +22,16 @@ Dead time, two sources:
 Needs ffmpeg/ffprobe on PATH and numpy (for the music).
 """
 import argparse
+import contextlib
+import hashlib
+import io
 import json
+import math
 import os
 import re
 import subprocess
 import sys
+import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 FPS = 30
@@ -57,16 +65,108 @@ def cover(a):
 
 
 def fingerprint(path):
-    """size + hash of the first and last MB: changes whenever the video is re-rendered."""
-    import hashlib
-    h = hashlib.sha1()
+    """Hash the entire file, including middle frames, for render and review invalidation."""
+    h = hashlib.sha256()
     size = os.path.getsize(path)
     with open(path, "rb") as f:
-        h.update(f.read(1 << 20))
-        if size > 2 << 20:
-            f.seek(-(1 << 20), 2)
-            h.update(f.read())
-    return f"{size}-{h.hexdigest()[:16]}"
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return f"{size}-{h.hexdigest()}"
+
+
+def read_review(video):
+    try:
+        with open(os.path.splitext(video)[0] + ".review.json", encoding="utf-8") as f:
+            review = json.load(f)
+        if review.get("fingerprint") == fingerprint(video) and review.get("review"):
+            return review
+    except (OSError, ValueError, AttributeError):
+        pass
+    return None
+
+
+def save_job(path, data):
+    """Replace the checkpoint atomically; interrupted writes cannot erase a previous phase."""
+    tmp = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=os.path.dirname(path),
+                                         suffix=".json", delete=False) as f:
+            tmp = f.name
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, path)
+    finally:
+        if tmp and os.path.exists(tmp):
+            os.remove(tmp)
+
+
+def finish(a):
+    """Run deterministic editing work once; a successful render is never a visual review."""
+    a.video, a.out = os.path.abspath(a.video), os.path.abspath(a.out)
+    if a.card:
+        a.card = os.path.abspath(a.card)
+    stem = os.path.splitext(a.out)[0]
+    job_path, sheet_path = stem + ".job.json", stem + ".sheet.png"
+    sources = [a.video] + ([a.card] if a.card else [])
+    sources += [os.path.splitext(p)[0] + ".marks.json" for p in sources]
+    outputs = [a.out, job_path, sheet_path, stem + ".review.json"]
+    if any(os.path.normcase(os.path.realpath(src)) == os.path.normcase(os.path.realpath(out))
+           for src in sources for out in outputs):
+        raise ValueError("output paths must differ from recording inputs")
+    if not a.out.lower().endswith(".mp4"):
+        raise ValueError("output must end in .mp4")
+    if a.width < 64 or a.width % 2:
+        raise ValueError("sheet width must be an even number of at least 64")
+    if any(not math.isfinite(t) or t < 0 for t in a.times):
+        raise ValueError("sheet times must be finite and nonnegative")
+    if any(not math.isfinite(v) or v <= 0 for v in (a.idle_keep, a.freeze, a.freeze_keep)):
+        raise ValueError("editing durations must be finite and positive")
+    os.makedirs(os.path.dirname(a.out), exist_ok=True)
+    job = {}
+    if os.path.exists(job_path):
+        with open(job_path, encoding="utf-8") as f:
+            job = json.load(f)
+        if not isinstance(job, dict):
+            raise ValueError("job checkpoint must be an object")
+    engine = [__file__] + ([os.path.join(HERE, "gen_music.py")] if not a.no_music else [])
+    key = {"sources": {p: fingerprint(p) if os.path.exists(p) else None for p in sources},
+           "engine": [fingerprint(p) for p in engine],
+           "options": [a.seed, a.idle_keep, a.freeze, a.freeze_keep, a.no_music]}
+    previous = job.get("edit", {})
+    cached = (not a.force and key == previous.get("key") and os.path.isfile(a.out)
+              and fingerprint(a.out) == previous.get("outputFingerprint"))
+    if not cached:
+        # Render beside the destination, then replace it only after encoding succeeds.
+        with tempfile.TemporaryDirectory(prefix=".edit-", dir=os.path.dirname(a.out)) as tmp:
+            edit_args = argparse.Namespace(**vars(a))
+            edit_args.out = os.path.join(tmp, "render.mp4")
+            with contextlib.redirect_stdout(io.StringIO()):
+                one(edit_args)
+            os.replace(edit_args.out, a.out)
+    output_fp = fingerprint(a.out)
+    seconds = duration(a.out)
+    # Commit the completed render before sheet extraction, which may fail independently.
+    job["edit"] = {"key": key, "outputFingerprint": output_fp, "video": a.out,
+                   "seconds": seconds, "sheet": sheet_path,
+                   "sheetKey": previous.get("sheetKey"), "sheetFingerprint": previous.get("sheetFingerprint")}
+    job.update({"schema": 1, "status": "needs-review"})
+    save_job(job_path, job)
+    if any(t >= seconds for t in a.times):
+        raise ValueError("sheet times must be earlier than the end of the edited video")
+    review = read_review(a.out)
+    sheet_key = [output_fp, a.times, a.width]
+    sheet_cached = (sheet_key == previous.get("sheetKey") and os.path.isfile(sheet_path)
+                    and fingerprint(sheet_path) == previous.get("sheetFingerprint"))
+    if not review and (a.force or not sheet_cached):
+        with contextlib.redirect_stdout(io.StringIO()):
+            sheet(argparse.Namespace(video=a.out, out=sheet_path, times=a.times, width=a.width))
+    job.update({"schema": 1, "status": "reviewed" if review else "needs-review"})
+    job["edit"] = {"key": key, "outputFingerprint": output_fp, "video": a.out,
+                   "seconds": seconds, "sheet": sheet_path, "sheetKey": sheet_key,
+                   "sheetFingerprint": fingerprint(sheet_path) if os.path.isfile(sheet_path) else None}
+    save_job(job_path, job)
+    print(json.dumps({"video": a.out, "seconds": round(seconds, 2), "cached": cached,
+                      "sheet": sheet_path if os.path.isfile(sheet_path) else None,
+                      "status": job["status"], "job": job_path}, ensure_ascii=False))
 
 
 def seen(a):
@@ -299,6 +399,18 @@ def concat(a):
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="mode", required=True)
+    f = sub.add_parser("finish", help="edit, cache and prepare one visual review")
+    f.add_argument("video")
+    f.add_argument("out")
+    f.add_argument("--card")
+    f.add_argument("--seed", type=int, default=7)
+    f.add_argument("--idle-keep", type=float, default=0.6)
+    f.add_argument("--freeze", type=float, default=2.5)
+    f.add_argument("--freeze-keep", type=float, default=1.2)
+    f.add_argument("--music", dest="no_music", action="store_false", default=True)
+    f.add_argument("--times", nargs="*", type=float, default=[])
+    f.add_argument("--width", type=int, default=1280)
+    f.add_argument("--force", action="store_true")
     o = sub.add_parser("one")
     o.add_argument("video")
     o.add_argument("out")
@@ -332,7 +444,8 @@ def main():
     r.add_argument("--save")
     r.add_argument("--by")
     a = p.parse_args()
-    {"one": one, "card": card, "concat": concat, "sheet": sheet, "seen": seen, "cover": cover}[a.mode](a)
+    {"finish": finish, "one": one, "card": card, "concat": concat,
+     "sheet": sheet, "seen": seen, "cover": cover}[a.mode](a)
 
 
 if __name__ == "__main__":

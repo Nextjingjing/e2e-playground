@@ -1,6 +1,8 @@
 # Recording details (show-and-tell)
 
-Read this when writing a case script, post-processing, reviewing, or running many cases. The rules in SKILL.md still apply.
+Read this for a custom case script or overlay/pacing details. Routine web cases use
+`assets/case-template.cjs` + `run-case.cjs`; editing/review commands are in `automation.md`.
+The rules in SKILL.md still apply.
 
 ## Why the workflow is strict about exploring once
 
@@ -115,9 +117,8 @@ Pictures are the expensive part (a full 1440×900 frame is ~1.7k tokens to look 
 
 ## Many cases: one subagent per case
 
-Cases are independent, so record them in parallel — one subagent each (or, in a tool
-without subagents, one session/terminal per case with the same brief), a mid-tier model
-is enough (the kit does the hard parts). Fill `references/agent-brief.md` once (shared
+Use one thread by default. Only substantial independent cases benefit from parallel
+recording; keep 2–3 workers and give each a narrow brief. Fill `references/agent-brief.md` once (shared
 rules + kit API) and give each agent only its case: data setup, story, card text, file
 name, music seed, unique identifiers.
 
@@ -125,11 +126,10 @@ name, music seed, unique identifiers.
   and hand recorders `FLOWS.md` (template: `references/flows-template.md`) plus a case
   block with routes, exact labels, data ids and the setup command — so they record instead
   of explore.
-- Recording runs long and can stop at any moment (quota, crash). Keep a `HANDOFF.md`
-  in the work folder (case table: status, files, data ids, what each take consumed, next
-  step) and have each agent keep `cases/<case>/STATUS.md` after every step, so the next
-  session — or another coding CLI given the same brief — continues instead of redoing.
-- Keep it to about 3–4 agents at a time. Recording agents are long-running; seven at once
+- The runner's `.job.json` checkpoints phases automatically. For custom recorders, keep one
+  equivalent case checkpoint at phase boundaries, not after every click. Shared `FLOWS.md`
+  is useful only when several workers need the same facts.
+- Keep it to 2–3 workers at a time. Recording agents are long-running; seven at once
   exhausted the session quota mid-take in practice. Queue the rest, or hand the remaining
   cases to another coding agent/CLI the user has (with the same brief) if quota is tight.
 - Each agent must be able to stop and report instead of improvising: "the real system does

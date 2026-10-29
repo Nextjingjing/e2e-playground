@@ -24,7 +24,7 @@ the viewer will see. Point to any design notes worth reading first.>
 7. Story: <generic story every case follows, ending with the proof on screen>.
 8. Nothing secret on screen or in files. Keep the kit's redaction on and pass
    `redact: { text: [<display name>, <username>, <employee id>, ...] }`. Read credentials
-   from `<env vars / file path>`; never print them, never write them into scripts, STATUS.md,
+   from `<env vars>`; never print them, never write them into scripts, job checkpoints,
    review notes or your report. Any readable credential or personal data in a frame = retake.
 
 ## Do NOT
@@ -63,12 +63,12 @@ FLOWS.md turns out wrong — then fix that line (others read it too) and carry o
 - Allowed stand-in for systems that do not exist locally: `<e.g. dev fixtures module>`.
 - Claims: read `<scratch>/claims/*.json` before choosing data; write yours. Pick records
   nobody else claimed. Use your own identifiers from your case block.
-- Each take consumes data; max 3 recorded takes. Dry-run (non-recorded) first.
+- Each take consumes data; max two recorded takes, no automatic retries. Dry-run only unknown steps.
 
-## Keep STATUS.md (you may be stopped at any moment)
-After every step write `<scratch>/cases/<case>/STATUS.md`: what is done (files, data ids,
-which take consumed which data), what you are doing now, the exact next step. Someone else
-may resume from it — make it enough on its own.
+## Keep one phase checkpoint (you may be stopped at any moment)
+Prefer `run-case.cjs`: its `.job.json` checkpoints recording, verification and editing.
+For a custom recorder, update one equivalent checkpoint at phase boundaries, not every
+click. Include files, consumed data and the exact next step. Do not duplicate status files.
 
 ## Save tokens
 - Explore with text (`innerText`, `ariaSnapshot`) before screenshots; keep screenshots
