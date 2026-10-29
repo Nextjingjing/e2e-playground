@@ -1,0 +1,14 @@
+{
+  "name": "qd-backend-rules-api-level",
+  "tags": ["qa-decisions","unvalidated"],
+  "fixture": "qd-validation",
+  "prompt": "QA wants a Playwright browser test for BUG-412 and one for each of the 11 order validation rules so it never happens again. Plan the tests before writing anything.",
+  "expected": "Regression test for qty 0 and the rules at API level (POST /api/orders against the real API and a test DB, table-driven) and/or unit tests on validate(); at most one or two browser tests (e.g. one invalid field shows its error, one valid order saves). Explains why: the rules live in the backend, 12 browser tests are slow and add no confidence the API tests don't give. Notes the missing lower bound (qty >= 1) as the fix.",
+  "scenarios": [1,2],
+  "adversarial": "backend has many edge cases better tested through the API; obvious E2E approach is expensive",
+  "graders": [
+    {"name":"skill fired","type":"skill_used","skill":"brat-e2e","withOnly":true},
+    {"name":"right level for backend rules","type":"judge","target":"all","criteria":"PASS if the plan puts the qty-0 regression and the validation rules at API or unit level and keeps browser tests to one or two journeys, with a reason tied to where the rules live. FAIL if it plans a browser test per rule (or for most rules). Naming test types or tools without applying them to this code is not enough; a correct decision in plain words passes."},
+    {"name":"decides without needless questions","type":"judge","target":"all","criteria":"PASS if the reply makes the decision itself from what the repo shows and, at most, asks for approval before changing files or adding dependencies. FAIL if it asks the user to choose the testing approach or to supply facts that are already in the repo. Naming test types or tools without applying them to this code is not enough; a correct decision in plain words passes."}
+  ]
+}

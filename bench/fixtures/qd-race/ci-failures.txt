@@ -1,0 +1,9 @@
+CI, last 30 runs of e2e/send-to-sorting.e2e.spec.js: 28 passed, 2 failed. Both failures:
+
+  Error: expect(received).toEqual(expected)
+  - Expected  [{"from":"FORKLIFT","to":"SORTING"}]
+  + Received  [{"from":"FORKLIFT","to":"SORTING"},{"from":"FORKLIFT","to":"SORTING"}]
+    at e2e/send-to-sorting.e2e.spec.js:10
+
+Trace of both failures: the click is delivered twice (pointer down retried after a layout shift); two POST /send-to-sorting requests 4 ms apart, both 200.
+Production: 3 support tickets this month about "pallet counted twice in sorting".

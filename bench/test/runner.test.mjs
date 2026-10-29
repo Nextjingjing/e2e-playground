@@ -41,8 +41,10 @@ test("end to end with the fake CLI writes results and a summary", async () => {
   assert.equal(c.delta, 0);
   assert.ok(c.tokens.with.output > 0);
   assert.ok(res.round.skillWords > 0 && res.round.descriptionWords > 0);
+  assert.equal(c.arms.with.fired, 2, "the fake CLI always loads the skill");
+  assert.match(c.arms.with.runs[0].messages[0], /wms_e2e/, "messages saved for regrading");
   assert.ok(fs.existsSync(path.join(res.dir, "results.json")));
-  assert.ok(fs.existsSync(path.join(res.dir, "summary.md")));
+  assert.match(fs.readFileSync(path.join(res.dir, "summary.md"), "utf8"), /\| tiny-case \|[^\n]*\| 2\/2 \|/);
 });
 
 test("an infra error (no turns) is retried once, then kept out of the score", async () => {
@@ -91,4 +93,15 @@ test("saved tool inputs don't carry the local user's home path", async () => {
   assert.ok(!out.includes(path.basename(home)), out);
   assert.match(out, /<workspace>\\\.claude/);
   assert.match(out, /<workspace>\/src/);
+});
+
+test("a round records which SKILL.md it measured and whether the tree was dirty", async () => {
+  process.env.FAKE_SCENARIO = "ok";
+  const root = suite();
+  fs.writeFileSync(path.join(root, "SKILL.md"), "---\nname: x\ndescription: y\n---\nbody A\n");
+  const a = await runSuite(opts(root, { arms: ["with"] }));
+  fs.writeFileSync(path.join(root, "SKILL.md"), "---\nname: x\ndescription: y\n---\nbody B\n");
+  const b = await runSuite(opts(root, { arms: ["with"] }));
+  assert.match(a.round.skillHash, /^[0-9a-f]{12}$/);
+  assert.notEqual(a.round.skillHash, b.round.skillHash, "a one-word skill change is visible in the round");
 });

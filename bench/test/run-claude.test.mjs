@@ -22,6 +22,7 @@ test("parses tools, tokens and final message", async () => {
   const run = await runClaude(base());
   assert.equal(run.isError, false);
   assert.equal(run.final, "plan text");
+  assert.deepEqual(run.messages, ["Plan: use a separate wms_e2e database.", "plan text"], "every assistant text, in order");
   assert.deepEqual(run.toolUses.map(t => t.name), ["Skill", "Read"]);
   assert.equal(run.toolUses[0].input.skill, "e2e-playground:brat-e2e");
   assert.deepEqual(run.tokens, { input: 10, cacheCreation: 100, cacheRead: 200, output: 50 });

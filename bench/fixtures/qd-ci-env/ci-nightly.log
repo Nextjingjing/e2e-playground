@@ -1,0 +1,10 @@
+[nightly #212] npm ci ... ok
+[nightly #212] docker compose -f compose.e2e.yml up -d ... ok
+[nightly #212] npx playwright test
+[WebServer] Error: P1001: Can't reach database server at `localhost:5433`
+[WebServer] Please make sure your database server is running at `localhost:5433`.
+Error: Timed out waiting 60000ms from config.webServer.
+1 error was not a part of any test, see above for details
+  0 passed, 0 failed, 1 did not run
+[nightly #212] exit code 1
+(nightly #211, and the PR checks for yesterday's button change, passed: 1 passed)

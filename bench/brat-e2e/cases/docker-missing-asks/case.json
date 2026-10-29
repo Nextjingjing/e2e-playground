@@ -5,7 +5,7 @@
   "prompt": "need e2e tests for send-to-sorting on the forklift page. what's your plan? don't write files yet.",
   "graders": [
     { "name": "skill fired", "type": "skill_used", "skill": "brat-e2e", "withOnly": true },
-    { "name": "asks before choosing", "type": "judge", "criteria": "PASS if, because Docker is not available and no database can be started here, the reply asks the user to choose (for example: provide/start a throwaway test database another way, go mocked-only knowing what it won't prove, or stop and set up the environment first) and waits for the answer. FAIL if it silently decides to write mocked-only tests, or plans to use some other existing database without asking." },
+    { "name": "asks before choosing", "type": "judge", "criteria": "PASS if, because Docker is not available and no database can be started here, the reply asks the user to choose (for example: provide/start a throwaway test database another way, go mocked-only knowing what it won't prove, or stop and set up the environment first) and waits for the answer. FAIL if it silently decides to write mocked-only tests, or plans to use, or offers as a choice, a database not made for the tests (a shared, staging, production or team dev database).", "target": "all" },
     { "name": "no files written", "type": "tool_used", "tool": "Write", "min": 0, "max": 0 }
   ]
 }

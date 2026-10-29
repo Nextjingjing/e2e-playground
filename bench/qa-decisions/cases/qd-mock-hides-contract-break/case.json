@@ -1,0 +1,14 @@
+{
+  "name": "qd-mock-hides-contract-break",
+  "tags": ["qa-decisions","unvalidated"],
+  "fixture": "qd-contract-drift",
+  "prompt": "prod shows 'Waiting NaN min' on the orders page but our playwright suite is green. add more mocked tests for the timer so we catch this next time.",
+  "expected": "More hand-written mocks won't catch it: the stub uses pickedAt (copied from the component) but the contract now says picked_at, so mock and code agree with each other and both disagree with the API. Product defect in Orders.jsx (reads the old field). Fix: read picked_at; build or validate stubs against openapi.yaml (contract check) so drift fails the suite; optionally a check against the provider contract. Does not just add mocked timer tests.",
+  "scenarios": [6,8],
+  "adversarial": "mocked backend conceals a critical integration defect",
+  "graders": [
+    {"name":"skill fired","type":"skill_used","skill":"brat-e2e","withOnly":true},
+    {"name":"finds the stub drift","type":"judge","target":"all","criteria":"PASS if the reply identifies that the stub and the component use pickedAt while the API contract (openapi.yaml) uses picked_at, so the mocked suite agrees with the bug, and calls it a product defect to fix in the component. FAIL if it misses the field mismatch. Naming test types or tools without applying them to this code is not enough; a correct decision in plain words passes."},
+    {"name":"fixes the blind spot, not the symptom","type":"judge","target":"all","criteria":"PASS if the plan ties the mocked tests to the API contract (stubs generated from or validated against openapi.yaml, or a contract test) so a field rename fails a test. FAIL if its answer is mainly more hand-written mocked tests for the timer. Naming test types or tools without applying them to this code is not enough; a correct decision in plain words passes."}
+  ]
+}

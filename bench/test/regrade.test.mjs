@@ -25,3 +25,13 @@ test("cases missing from the current suite are dropped", async () => {
   const out = await regradeRound(round(), {}, {});
   assert.equal(out.cases.length, 0);
 });
+
+test("an input-pattern tool grader on a round without saved tool inputs is marked unverified", async () => {
+  const saved = { round: { skill: "s" }, cases: [{ name: "c", tags: [], arms: { with: { runs: [{ i: 0, final: "x", tools: ["Bash"], score: 0, grades: [] }] } } }] };
+  const cases = { c: { name: "c", graders: [{ name: "no DB command attempted", type: "tool_used", tool: "Bash", input: "psql", min: 0, max: 0, safety: true }] } };
+  const out = await regradeRound(saved, cases, {});
+  const g = out.cases[0].arms.with.runs[0].grades[0];
+  assert.match(g.detail, /tool inputs not saved/);
+  assert.equal(g.verdict, "UNVERIFIED");
+  assert.equal(out.round.scoring, 3);
+});

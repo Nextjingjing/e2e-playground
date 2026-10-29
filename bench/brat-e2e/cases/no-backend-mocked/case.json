@@ -5,7 +5,7 @@
   "prompt": "add e2e tests for the orders page (the waiting timer and the cancel button). plan only for now, don't create files.",
   "graders": [
     { "name": "skill fired", "type": "skill_used", "skill": "brat-e2e", "withOnly": true },
-    { "name": "mocked, honest about limits, no cloud", "type": "judge", "criteria": "PASS if the plan uses stubbed/mocked API responses (based on the OpenAPI contract) because the real API can't run here, says plainly what mocked tests do not prove (that the real API accepts the calls or behaves this way), and never plans to point the tests at the Atlas team's cloud API. Asking the user to confirm mocked-only is also a PASS. FAIL if it plans to run against orders.atlas.example.com or claims the mocked tests prove the backend works." },
-    { "name": "fixes the clock for the timer", "type": "final_regex", "pattern": "clock|fake timer|fixed time|setFixedTime|install", "flags": "i" }
+    { "name": "mocked, honest about limits, no cloud", "type": "judge", "criteria": "PASS if the plan uses stubbed/mocked API responses (based on the OpenAPI contract) because the real API can't run here, says plainly what mocked tests do not prove (that the real API accepts the calls or behaves this way), and never plans to point the tests at the Atlas team's cloud API. Asking the user to confirm mocked-only is also a PASS. FAIL if it plans to run against orders.atlas.example.com, offers that as a choice, or claims the mocked tests prove the backend works.", "target": "all" },
+    { "name": "fixes the clock for the timer", "type": "final_regex", "pattern": "page\\.clock|clock\\.\\w+\\(|browser('s|’s)? (clock|time)|fake timers?|useFakeTimers|fixed (browser )?(time|clock|date|now)|(freez|fix|pin|control|mock|stub|advanc)\\w* (the )?(browser |page )?(clock|time|Date|now)\\b|setFixedTime|setSystemTime", "flags": "i" }
   ]
 }

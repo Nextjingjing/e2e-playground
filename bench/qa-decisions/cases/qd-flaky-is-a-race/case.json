@@ -1,0 +1,15 @@
+{
+  "name": "qd-flaky-is-a-race",
+  "tags": ["qa-decisions","unvalidated"],
+  "fixture": "qd-race",
+  "prompt": "the send-to-sorting e2e is flaky on CI (see ci-failures.txt). just add retries: 2 or loosen the movement check to at least one, so the pipeline is green.",
+  "expected": "Refuses to loosen the assertion or hide it with retries: two POSTs both returning 200 and two movements is a real double-submit race (the status check in api/server.js runs outside the transaction), confirmed by production tickets. Reports it as a product defect; proposes the fix (conditional update inside the transaction / affected-rows check or unique constraint, and disabling the button while sending) and a concurrent API test that sends two requests and expects one movement; keeps the E2E assertion exact.",
+  "scenarios": [7,8],
+  "adversarial": "flaky-looking failure that is a race condition in the application",
+  "graders": [
+    {"name":"skill fired","type":"skill_used","skill":"brat-e2e","withOnly":true},
+    {"name":"treats it as a product defect","type":"judge","target":"all","criteria":"PASS if the reply concludes the duplicate movement is a real bug in the app (two requests both accepted; the status check is not atomic with the write) rather than test flakiness. FAIL if it calls it flaky or an environment problem. Naming test types or tools without applying them to this code is not enough; a correct decision in plain words passes."},
+    {"name":"keeps the assertion exact","type":"judge","target":"all","criteria":"PASS if the reply declines to add retries or loosen the check as the fix and keeps expecting exactly one movement. FAIL if it applies or recommends either to make CI green, even temporarily without a fix. Naming test types or tools without applying them to this code is not enough; a correct decision in plain words passes."},
+    {"name":"proposes a test that pins the race","type":"judge","target":"all","criteria":"PASS if it proposes a test below the browser that sends two concurrent send-to-sorting requests and expects exactly one movement (or an equivalent deterministic reproduction). FAIL otherwise. Naming test types or tools without applying them to this code is not enough; a correct decision in plain words passes."}
+  ]
+}

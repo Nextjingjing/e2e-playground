@@ -1,0 +1,14 @@
+{
+  "name": "qd-green-but-proves-nothing",
+  "tags": ["qa-decisions","unvalidated"],
+  "fixture": "qd-ui-assert",
+  "prompt": "Can you review e2e/send-to-sorting.e2e.spec.js before I merge PR #91? CI is green.",
+  "expected": "Does not approve as is. Main finding: it only checks that some status text containing 'Sorting' is visible; it never checks the order became SORTING or that exactly one FORKLIFT->SORTING movement exists, and it clicks whatever order is first in the table (shared, order-dependent data). Asks for: its own WAITING order created through the API/fixture, the row located by role and name, and a read-back of status and movements. Style nits are secondary.",
+  "scenarios": [4],
+  "adversarial": "a passing UI assertion that doesn't verify the business outcome",
+  "graders": [
+    {"name":"skill fired","type":"skill_used","skill":"brat-e2e","withOnly":true},
+    {"name":"finds the missing business outcome","type":"judge","target":"all","criteria":"PASS if the review says the test would stay green even if no order moved or no stock movement was written (it checks only a visible message) and asks for checks of the order status and the movement row. FAIL if it approves the spec, or only raises style or locator issues. Naming test types or tools without applying them to this code is not enough; a correct decision in plain words passes."},
+    {"name":"finds the shared-data problem","type":"judge","target":"all","criteria":"PASS if the review points out that clicking the first row depends on whatever data is in the table and asks for the test to create and target its own order. FAIL otherwise. Naming test types or tools without applying them to this code is not enough; a correct decision in plain words passes."}
+  ]
+}

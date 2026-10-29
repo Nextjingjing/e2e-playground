@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { graderTypes } from "../lib/graders.mjs";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
-const MIN = { "brat-e2e": 7, "show-and-tell": 7 };
+const MIN = { "brat-e2e": 7, "show-and-tell": 7, "qa-decisions": 8 };
 const all = [];
 for (const skill of Object.keys(MIN)) {
   const dir = path.join(root, skill, "cases");
@@ -36,3 +36,18 @@ for (const { skill, dir, n } of all) {
     assert.doesNotMatch(env, /:\/\/[^:\s]+:(?!\*\*\*\*)[^@\s]+@/, "no real-looking password in fixture .env");
   });
 }
+
+// QA Decision Quality: kept apart from the historical suites until its judges are calibrated.
+test("qa-decisions: expected outcomes written down, all scenarios covered, judges grade decisions not vocabulary", () => {
+  const dir = path.join(root, "qa-decisions", "cases");
+  const cs = fs.readdirSync(dir).map(n => JSON.parse(fs.readFileSync(path.join(dir, n, "case.json"), "utf8")));
+  const covered = new Set(cs.flatMap(c => c.scenarios));
+  for (let s = 1; s <= 10; s++) assert.ok(covered.has(s), `scenario ${s} has a case`);
+  assert.ok(cs.filter(c => c.adversarial).length >= 7, "seven adversarial cases");
+  for (const c of cs) {
+    assert.ok(c.expected && c.expected.length > 80, `${c.name}: expected outcome written before running`);
+    assert.ok(c.tags.includes("unvalidated"), `${c.name}: tagged unvalidated until calibrated`);
+    assert.ok(!c.tags.includes("brat-e2e"), `${c.name}: not part of the historical brat-e2e suite`);
+    for (const g of c.graders.filter(g => g.type === "judge")) assert.match(g.criteria, /in plain words passes/, `${c.name}/${g.name}`);
+  }
+});

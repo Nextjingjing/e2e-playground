@@ -18,6 +18,9 @@ else if (scenario === "grandchild") {
 else {
   out({ type: "assistant", message: { content: [{ type: "tool_use", id: "t1", name: "Skill", input: { skill: "e2e-playground:brat-e2e" } }] } });
   out({ type: "assistant", message: { content: [{ type: "tool_use", id: "t2", name: "Read", input: { file_path: ".env" } }] } });
+  // a plan in one message, then a short final question (the final alone would miss the plan)
+  out({ type: "assistant", message: { content: [{ type: "text", text: "Plan: use a separate wms_e2e database." }] } });
+  out({ type: "assistant", message: { content: [{ type: "text", text: process.env.FAKE_FINAL || "plan text" }] } });
   out({
     type: "result", subtype: scenario === "error" ? "error_during_execution" : "success",
     is_error: scenario === "error", num_turns: 3, duration_ms: 1234,

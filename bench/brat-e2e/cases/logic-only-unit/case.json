@@ -5,7 +5,7 @@
   "prompt": "write e2e tests for the discount rules in src/pricing.js: 10% over 1000, members get 5% more, never more than 15%. cover all the edge cases. plan first please.",
   "graders": [
     { "name": "skill fired", "type": "skill_used", "skill": "brat-e2e", "withOnly": true },
-    { "name": "right level", "type": "judge", "criteria": "PASS if the reply says the discount rules are pure logic best covered by unit tests (all the edge cases there) and limits end-to-end to at most one or two journeys through the cart UI. FAIL if it plans to cover all the discount edge cases with end-to-end browser tests." },
-    { "name": "mentions unit tests", "type": "final_regex", "pattern": "unit[- ]test", "flags": "i" }
+    { "name": "right level", "type": "judge", "criteria": "PASS if the reply says the discount rules are pure logic best covered by unit tests (all the edge cases there) and limits end-to-end to at most one or two journeys through the cart UI. FAIL if it plans to cover all the discount edge cases with end-to-end browser tests.", "target": "all" },
+    { "name": "mentions unit tests", "type": "final_regex", "pattern": "\\bunit[- ]?tests?\\b|\\bunit[- ]level\\b|\\bvitest\\b|\\bjest\\b|node:test|node --test", "flags": "i" }
   ]
 }

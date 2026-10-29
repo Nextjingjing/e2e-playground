@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Benchmark runner: every case × arm (with / without the plugin) × run, graded and aggregated.
 //   node bench/run.mjs [--skill brat-e2e] [--tag cheap] [--case name] [--runs 3] [--arms with,without]
-//                      [-j 3] [--max-usd 3] [--model openai/gpt-6.1-sol] [--effort medium] [--keep]
+//                      [--suite qa-decisions] [-j 3] [--max-usd 3] [--model openai/gpt-6.1-sol] [--effort medium] [--keep] [--plugin-dir <copy>]
 // Writes bench/results/<stamp>/results.json and summary.md. Needs OPENROUTER_API_KEY.
 import fs from "node:fs";
 import path from "node:path";
@@ -9,8 +9,8 @@ import os from "node:os";
 import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { runClaude } from "./lib/run-claude.mjs";
-import { grade, makeJudge } from "./lib/graders.mjs";
-import { scoreRun, scoreCase, runCost } from "./lib/score.mjs";
+import { grade, makeJudge, gradersHash } from "./lib/graders.mjs";
+import { scoreRun, scoreCase, runSafe, runCost, SCORING_VERSION } from "./lib/score.mjs";
 import { claudeEnv, openrouterUsage } from "./lib/openrouter.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -20,8 +20,12 @@ const PRICES = {
   "openai/gpt-6-luna": { in: 0.1, out: 0.5, cacheWrite: 0.125, cacheRead: 0.01 },
 };
 
-function loadCases(root, skill, { tag, caseName } = {}) {
-  const dir = path.join(root, skill, "cases");
+// Bump when the runner changes what a round measures or saves (evidence, isolation, defaults).
+export const BENCH_VERSION = "2026-10-25";
+
+// A suite is a folder of cases (bench/<suite>/cases); it defaults to the skill's own suite.
+function loadCases(root, suite, { tag, caseName } = {}) {
+  const dir = path.join(root, suite, "cases");
   return fs.readdirSync(dir).filter(n => fs.existsSync(path.join(dir, n, "case.json")))
     .map(n => ({ runs: 3, maxTurns: 15, timeoutSec: 300, tools: ["Read", "Glob", "Grep", "Skill"], tags: [], ...JSON.parse(fs.readFileSync(path.join(dir, n, "case.json"), "utf8")) }))
     .filter(c => (!tag || c.tags.includes(tag)) && (!caseName || c.name === caseName));
@@ -32,7 +36,9 @@ function wordCounts(skillFile) {
   const m = text.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
   const words = s => (s.match(/\S+/g) || []).length;
   const desc = m ? (m[1].match(/^description:\s*(.*)$/m) || [, ""])[1] : "";
-  return { skillWords: words(m ? m[2] : text), descriptionWords: words(desc) };
+  // skillHash identifies the exact SKILL.md measured: the commit alone doesn't when the tree is dirty
+  // or --plugin-dir points at a copy
+  return { skillWords: words(m ? m[2] : text), descriptionWords: words(desc), skillHash: gradersHash(text.replace(/\r\n/g, "\n")) };
 }
 
 // Tool inputs are saved for regrading; the workspace and home paths in them hold the local user name.
@@ -52,9 +58,11 @@ async function pool(jobs, n, fn) {
 export async function runSuite(o) {
   if (o.claudeBin) process.env.BENCH_CLAUDE_BIN = o.claudeBin;
   const model = o.model || "openai/gpt-6.1-sol";
-  const cases = loadCases(o.root, o.skill, o);
+  const suite = o.suite || o.skill;
+  const cases = loadCases(o.root, suite, o);
   const usage0 = await o.usage();
-  const results = cases.map(c => ({ name: c.name, tags: c.tags, arms: Object.fromEntries(o.arms.map(a => [a, { runs: [] }])) }));
+  const results = cases.map(c => ({ name: c.name, tags: c.tags, gradersHash: gradersHash(c.graders),
+    configHash: gradersHash({ prompt: c.prompt, fixture: c.fixture, tools: c.tools, maxTurns: c.maxTurns, timeoutSec: c.timeoutSec, arms: c.arms }), arms: Object.fromEntries(o.arms.map(a => [a, { runs: [] }])) }));
   const jobs = [];
   // a case may run in fewer arms, e.g. "does the skill fire?" cases only make sense with the plugin
   cases.forEach((c, ci) => { for (const arm of o.arms.filter(a => !c.arms || c.arms.includes(a))) for (let i = 0; i < (o.runs || c.runs); i++) jobs.push({ c, ci, arm, i }); });
@@ -80,20 +88,23 @@ export async function runSuite(o) {
     for (const g of c.graders) grades.push(await grade(run, g, { judge: o.judge }));
     const score = scoreRun(grades);
     slot.push({ i, attempts, score, grades, tokens: run.tokens, turns: run.turns, durationMs: run.durationMs,
-      isError: run.isError, error: run.error, final: run.final, tools: run.toolUses.map(t => t.name),
+      isError: run.isError, error: run.error, final: run.final, messages: run.messages, tools: run.toolUses.map(t => t.name),
       // kept short so tool graders can be re-scored later (regrade.mjs) without bloating the file
       toolUses: run.toolUses.map(t => ({ name: t.name, input: Object.fromEntries(Object.entries(t.input || {})
         .map(([k, v]) => [k, scrubPaths(typeof v === "string" ? v : JSON.stringify(v), run.workspace).slice(0, 200)])) })),
       costUsd: runCost(run.tokens, PRICES[model] || PRICES["openai/gpt-6.1-sol"]) });
     if (!o.keep) try { fs.rmSync(run.workspace, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch {}
-    if (!o.quiet) console.log(`${c.name} [${arm} #${i + 1}] score ${score.toFixed(2)}${run.isError ? " ERROR " + run.error : ""}`);
+    if (!o.quiet) console.log(`${c.name} [${arm} #${i + 1}] score ${score == null ? "unverified" : score.toFixed(2)}${run.isError ? " ERROR " + run.error : ""}`);
   });
 
   for (const r of results) {
     for (const arm of Object.keys(r.arms)) {
       const a = r.arms[arm], done = a.runs.filter(x => !x.skipped && !x.infraError).sort((x, y) => x.i - y.i);
-      const s = scoreCase(done.map(x => x.score));
-      a.mean = s.mean; a.passAll = s.passAll; a.infraErrors = a.runs.filter(x => x.infraError).length;
+      const s = scoreCase(done.map(x => x.score), done.map(x => runSafe(x.grades, x.score)));
+      // how often the skill loaded: runs where it didn't score like the no-skill arm
+      a.fired = done.some(x => x.grades.some(g => g.type === "skill_used"))
+        ? done.filter(x => x.grades.some(g => g.type === "skill_used" && g.passed)).length : null;
+      a.mean = s.mean; a.passAll = s.passAll; a.safety = s.safety; a.infraErrors = a.runs.filter(x => x.infraError).length;
       a.runs = a.runs.sort((x, y) => x.i - y.i);
       r.tokens = r.tokens || {}; r.durationMs = r.durationMs || {}; r.costUsd = r.costUsd || {};
       r.tokens[arm] = done.reduce((t, x) => ({ input: t.input + x.tokens.input, cacheCreation: t.cacheCreation + x.tokens.cacheCreation, cacheRead: t.cacheRead + x.tokens.cacheRead, output: t.output + x.tokens.output }), { input: 0, cacheCreation: 0, cacheRead: 0, output: 0 });
@@ -105,8 +116,12 @@ export async function runSuite(o) {
 
   let commit = "unknown";
   try { commit = execSync("git rev-parse --short HEAD", { cwd: o.root, stdio: ["ignore", "pipe", "ignore"] }).toString().trim(); } catch {}
-  const round = { date: new Date().toISOString(), commit, skill: o.skill, model, judge: o.judgeModel || "anthropic/claude-haiku-5.5",
-    effort: o.effort || "medium", arms: o.arms, ...wordCounts(o.skillFile), spendUsd: (await o.usage()) - usage0 };
+  let dirty = null;   // uncommitted changes: the commit doesn't describe what ran
+  try { dirty = execSync("git status --porcelain", { cwd: o.root, stdio: ["ignore", "pipe", "ignore"] }).toString().trim() !== ""; } catch {}
+  if (dirty) commit += "+dirty";
+  const round = { date: new Date().toISOString(), commit, benchVersion: BENCH_VERSION, suite, skill: o.skill,
+    evidence: { messages: true, toolInputs: true }, model, judge: o.judgeModel || "anthropic/claude-haiku-5.5",
+    effort: o.effort || "medium", arms: o.arms, scoring: SCORING_VERSION, ...wordCounts(o.skillFile), spendUsd: (await o.usage()) - usage0 };
   const dir = path.join(o.out, round.date.replace(/[:.]/g, "-"));
   fs.mkdirSync(dir, { recursive: true });
   const out = { round, cases: results };
@@ -117,13 +132,14 @@ export async function runSuite(o) {
 
 const f2 = v => (v == null ? "–" : v.toFixed(2));
 export function summary({ round, cases }) {
-  const lines = [`# ${round.skill} benchmark ${round.date}`, "",
+  const lines = [`# ${round.suite || round.skill} benchmark ${round.date}`, "",
     `commit ${round.commit} · agent ${round.model} (effort ${round.effort}) · judge ${round.judge}`,
-    `SKILL.md ${round.skillWords} words · description ${round.descriptionWords} words · OpenRouter spend $${round.spendUsd.toFixed(4)}`, "",
-    "| case | with | without | Δ | safety pass^k | infra errors | tokens out (with) | avg s (with) | est. $ (with) |", "|---|---|---|---|---|---|---|---|---|"];
+    `SKILL.md ${round.skillWords} words (sha ${round.skillHash}) · description ${round.descriptionWords} words · OpenRouter spend $${round.spendUsd.toFixed(4)}`, "",
+    "| case | with | without | Δ | skill fired (with) | safety pass^k | infra errors | tokens out (with) | avg s (with) | est. $ (with) |", "|---|---|---|---|---|---|---|---|---|---|"];
   for (const c of cases) {
     const w = c.arms.with || {}, wo = c.arms.without || {};
-    lines.push(`| ${c.name} | ${f2(w.mean)} | ${f2(wo.mean)} | ${f2(c.delta)} | ${c.tags.includes("safety") ? (w.passAll ? "yes" : "**NO**") : ""} | ${(w.infraErrors || 0) + (wo.infraErrors || 0) || ""} | ${c.tokens.with ? c.tokens.with.output : "–"} | ${c.durationMs.with != null ? (c.durationMs.with / 1000).toFixed(0) : "–"} | ${c.costUsd.with != null ? c.costUsd.with.toFixed(3) : "–"} |`);
+    const scoredRuns = (w.runs || []).filter(x => !x.skipped && !x.infraError).length;
+    lines.push(`| ${c.name} | ${f2(w.mean)} | ${f2(wo.mean)} | ${f2(c.delta)} | ${w.fired != null && scoredRuns ? `${w.fired}/${scoredRuns}` : "–"} | ${c.tags.includes("safety") ? (w.safety === "fail" ? "**NO**" : w.safety === "unverified" ? "unverified" : "yes") : ""} | ${(w.infraErrors || 0) + (wo.infraErrors || 0) || ""} | ${c.tokens.with ? c.tokens.with.output : "–"} | ${c.durationMs.with != null ? (c.durationMs.with / 1000).toFixed(0) : "–"} | ${c.costUsd.with != null ? c.costUsd.with.toFixed(3) : "–"} |`);
   }
   return lines.join("\n") + "\n";
 }
@@ -133,11 +149,13 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const opt = (k, d) => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : d; };
   const skill = opt("--skill", "brat-e2e");
   const env = claudeEnv({ effort: opt("--effort", "medium") });
+  // --plugin-dir: a copy of the plugin with a candidate change (e.g. another description) to A/B it
+  const pluginDir = path.resolve(opt("--plugin-dir", path.join(here, "..", "plugins", "e2e-playground")));
   runSuite({
-    root: here, skill, tag: opt("--tag"), caseName: opt("--case"), runs: opt("--runs") ? Number(opt("--runs")) : undefined,
+    root: here, skill, suite: opt("--suite", skill), tag: opt("--tag"), caseName: opt("--case"), runs: opt("--runs") ? Number(opt("--runs")) : undefined,
     arms: opt("--arms", "with,without").split(","), concurrency: Number(opt("-j", "3")), maxUsd: Number(opt("--max-usd", "3")),
     model: opt("--model", "openai/gpt-6.1-sol"), effort: opt("--effort", "medium"), keep: argv.includes("--keep"),
-    pluginDir: path.resolve(here, "..", "plugins", "e2e-playground"), skillFile: path.resolve(here, "..", "plugins", "e2e-playground", "skills", skill, "SKILL.md"),
+    pluginDir, skillFile: path.join(pluginDir, "skills", skill, "SKILL.md"),
     out: path.join(here, "results"), env, usage: openrouterUsage, judge: makeJudge({ env }),
   }).then(r => { console.log(`\n${summary(r)}\nresults: ${r.dir}`); })
     .catch(e => { console.error(e.message); process.exit(1); });

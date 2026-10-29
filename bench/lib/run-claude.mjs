@@ -26,7 +26,9 @@ export async function runClaude({ fixtureDir, prompt, withPlugin, pluginDir, mod
 
   const [cmd, pre] = claudeCommand();
   const started = Date.now();
-  const run = { workspace, final: "", toolUses: [], turns: 0, durationMs: 0, tokens: { input: 0, cacheCreation: 0, cacheRead: 0, output: 0 }, isError: false, error: "" };
+  // messages: every assistant text block in order. `final` is only the last turn's text, and an agent
+  // that writes its plan and then asks "may I go ahead?" leaves the plan out of `final`.
+  const run = { workspace, final: "", messages: [], toolUses: [], turns: 0, durationMs: 0, tokens: { input: 0, cacheCreation: 0, cacheRead: 0, output: 0 }, isError: false, error: "" };
 
   await new Promise(resolve => {
     const child = spawn(cmd, [...pre, ...args], { cwd: workspace, env: { ...process.env, ...env, CLAUDE_CONFIG_DIR: configDir }, stdio: ["pipe", "pipe", "pipe"] });
@@ -48,7 +50,10 @@ export async function runClaude({ fixtureDir, prompt, withPlugin, pluginDir, mod
         if (!line.startsWith("{")) continue;
         let ev; try { ev = JSON.parse(line); } catch { continue; }
         const content = ev.message && Array.isArray(ev.message.content) ? ev.message.content : [];
-        if (ev.type === "assistant") for (const c of content) if (c.type === "tool_use") run.toolUses.push({ name: c.name, input: c.input || {} });
+        if (ev.type === "assistant") for (const c of content) {
+          if (c.type === "tool_use") run.toolUses.push({ name: c.name, input: c.input || {} });
+          if (c.type === "text" && c.text && c.text.trim()) run.messages.push(c.text.trim());
+        }
         if (ev.type === "result") {
           gotResult = true;
           run.final = ev.result || "";

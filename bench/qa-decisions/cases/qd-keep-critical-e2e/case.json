@@ -1,0 +1,14 @@
+{
+  "name": "qd-keep-critical-e2e",
+  "tags": ["qa-decisions","unvalidated"],
+  "fixture": "qd-rollback",
+  "prompt": "BUG-430 is fixed (see BUG.md). Do what the tech lead asked on the PR. Plan first.",
+  "expected": "Adds an API/integration test that forces the status update to fail and checks no movement is written (rollback), and KEEPS the single forklift E2E: it is the only end-to-end check of a stock journey that cost money, it is cheap (~40 s suite). Pushes back on the deletion with that reasoning rather than complying blindly; doesn't try to reproduce the rollback through the browser.",
+  "scenarios": [2,3],
+  "adversarial": "a backend-only defect where deleting the E2E looks reasonable",
+  "graders": [
+    {"name":"skill fired","type":"skill_used","skill":"brat-e2e","withOnly":true},
+    {"name":"adds the rollback test at the right level","type":"judge","target":"all","criteria":"PASS if the plan adds a test below the browser (API or integration, against a real database) that makes the status update fail and checks that no stock movement is left. FAIL if there is no rollback test, or it tries to cover the rollback with a browser test. Naming test types or tools without applying them to this code is not enough; a correct decision in plain words passes."},
+    {"name":"keeps the critical journey's E2E","type":"judge","target":"all","criteria":"PASS if the reply keeps e2e/send-to-sorting.e2e.spec.js (or an equivalent single browser journey) and explains that it is the only end-to-end check of a stock journey whose failure cost money. FAIL if it deletes it, or agrees to delete it, without such a reason. Naming test types or tools without applying them to this code is not enough; a correct decision in plain words passes."}
+  ]
+}

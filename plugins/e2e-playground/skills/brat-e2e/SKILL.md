@@ -62,6 +62,8 @@ database. Stub only what you don't control or can't make happen on purpose.
   Never offer a shared or production DB. If none of the four is true, don't ask about the
   database: e.g. `.env` points at the local dev DB and Docker works → plan the separate `_e2e`
   container and go on (asking before adding Playwright is still right).
+  Decide from what the project shows (README, compose file, `.env`): a check you can't run
+  here (no shell) is not "missing". State the assumption in the plan and go on.
 - **Mocked only**: say in the report it proves the UI against the API contract, not the
   backend, and name what would make it real.
 

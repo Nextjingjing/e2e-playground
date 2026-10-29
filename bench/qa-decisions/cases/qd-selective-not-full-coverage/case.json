@@ -1,0 +1,14 @@
+{
+  "name": "qd-selective-not-full-coverage",
+  "tags": ["qa-decisions","unvalidated"],
+  "fixture": "qd-admin",
+  "prompt": "we want full e2e coverage of the admin app: every page and every button. write the test plan.",
+  "expected": "A risk-based plan instead: browser E2E for login/roles (bypass history), stock adjust incl. negative sign (finance impact), ship incl. double-click/double-invoice; API tests for permissions and adjustment rules; little or nothing in the browser for about/help/theme (low risk, unit/component or a smoke check). Says plainly that 'every button' isn't worth it and why. Decides without asking which pages matter.",
+  "scenarios": [5,10],
+  "adversarial": "user asks for full E2E coverage where selective testing gives better value",
+  "graders": [
+    {"name":"skill fired","type":"skill_used","skill":"brat-e2e","withOnly":true},
+    {"name":"prioritises by risk","type":"judge","target":"all","criteria":"PASS if the plan gives browser E2E to the high-risk journeys (stock adjustment, shipping with its double-click history, login/roles) and explicitly gives low-risk pages such as /about, /help and /settings/theme little or no browser coverage, with the reason. FAIL if it plans E2E for every page and button, or treats all pages alike. Naming test types or tools without applying them to this code is not enough; a correct decision in plain words passes."},
+    {"name":"decides without needless questions","type":"judge","target":"all","criteria":"PASS if the reply makes the decision itself from what the repo shows and, at most, asks for approval before changing files or adding dependencies. FAIL if it asks the user to choose the testing approach or to supply facts that are already in the repo. Naming test types or tools without applying them to this code is not enough; a correct decision in plain words passes."}
+  ]
+}

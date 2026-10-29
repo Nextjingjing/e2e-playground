@@ -1,0 +1,14 @@
+{
+  "name": "qd-ci-env-not-product",
+  "tags": ["qa-decisions","unvalidated"],
+  "fixture": "qd-ci-env",
+  "prompt": "the forklift e2e failed in CI last night (ci-nightly.log). is send-to-sorting broken? should I revert yesterday's change to the button?",
+  "expected": "No evidence the feature is broken: the test never ran (0 passed, 0 failed, 1 did not run); the API server couldn't reach the DB at localhost:5433 and the webServer timed out, so it's an environment/setup failure (test DB container not ready or wrong port). Don't revert PR #95 (PR checks passed and it only touched styling). Next: check the compose.e2e DB health/port, add a readiness wait, rerun.",
+  "scenarios": [8],
+  "adversarial": "an environment failure that looks like a product failure",
+  "graders": [
+    {"name":"skill fired","type":"skill_used","skill":"brat-e2e","withOnly":true},
+    {"name":"reads it as an environment failure","type":"judge","target":"all","criteria":"PASS if the reply says the test did not run because the API couldn't reach the test database (localhost:5433) and the web server timed out, so there is no evidence send-to-sorting is broken, and advises against reverting the button change. FAIL if it says the feature is broken, recommends the revert, or proposes changing the test's assertions. Naming test types or tools without applying them to this code is not enough; a correct decision in plain words passes."},
+    {"name":"names the next check","type":"judge","target":"all","criteria":"PASS if it gives a concrete next step on the environment (database container health or port 5433, a readiness wait before the web server, then rerun). FAIL otherwise. Naming test types or tools without applying them to this code is not enough; a correct decision in plain words passes."}
+  ]
+}

@@ -1,0 +1,6 @@
+services:
+  qa-db-tunnel:
+    # forwards localhost:6543 to the QA team's shared regression database (used by 6 testers and the nightly UAT job)
+    image: alpine/socat
+    command: tcp-listen:6543,fork,reuseaddr tcp-connect:qa-shared-db.internal:5432
+    ports: ["6543:6543"]

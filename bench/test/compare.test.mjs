@@ -32,3 +32,36 @@ test("warns when the model or judge differ and reports skill size", () => {
   assert.match(out.warnings.join(" "), /model/);
   assert.equal(out.size.skillWords, -100);
 });
+
+test("warns when a case's graders differ between rounds or are unknown", () => {
+  const a = { round: round(), cases: [kase("same", 1, { gradersHash: "h1" }), kase("changed", 1, { gradersHash: "h1" }), kase("old", 1)] };
+  const b = { round: round(), cases: [kase("same", 1, { gradersHash: "h1" }), kase("changed", 1, { gradersHash: "h2" }), kase("old", 1, { gradersHash: "h3" })] };
+  const out = compareRounds(a, b);
+  const notes = n => out.rows.find(r => r.name === n).notes.join(" ");
+  assert.equal(notes("same"), "");
+  assert.match(notes("changed"), /graders changed/);
+  assert.match(notes("old"), /graders unknown/);
+  assert.match(out.warnings.join(" "), /2 case\(s\) graded differently/);
+});
+
+test("warns when the scoring rules differ; rounds without the field count as version 1", () => {
+  const out = compareRounds({ round: round(), cases: [] }, { round: round({ scoring: 2 }), cases: [] });
+  assert.match(out.warnings.join(" "), /scoring rules differ: v1 → v2/);
+  assert.equal(compareRounds({ round: round({ scoring: 2 }), cases: [] }, { round: round({ scoring: 2 }), cases: [] }).warnings.length, 0);
+});
+
+test("UNVERIFIED safety is its own flag, not a pass and not a regression", () => {
+  const a = { round: round(), cases: [kase("s", 1, { tags: ["safety"] })] };
+  const b = { round: round(), cases: [kase("s", 1, { tags: ["safety"], arms: { with: { mean: 1, passAll: false, safety: "unverified" }, without: { mean: 0 } } })] };
+  assert.equal(compareRounds(a, b).rows[0].flag, "UNVERIFIED");
+});
+
+test("warns when the rounds saved different evidence or come from different suites", async () => {
+  const { evidenceOf } = await import("../compare.mjs");
+  const oldRound = { round: round(), cases: [kase("x", 1, { arms: { with: { mean: 1, runs: [{ final: "f" }] } } })] };
+  const newRound = { round: round({ evidence: { messages: true, toolInputs: true }, suite: "brat-e2e" }), cases: [] };
+  assert.deepEqual(evidenceOf(oldRound), { messages: false, toolInputs: false });
+  const out = compareRounds(oldRound, newRound);
+  assert.match(out.warnings.join(" "), /evidence differs: messages/);
+  assert.match(compareRounds({ round: round({ suite: "brat-e2e" }), cases: [] }, { round: round({ suite: "qa-decisions" }), cases: [] }).warnings.join(" "), /different suites/);
+});

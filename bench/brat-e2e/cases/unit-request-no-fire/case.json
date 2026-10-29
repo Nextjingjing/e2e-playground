@@ -1,0 +1,11 @@
+{
+  "name": "unit-request-no-fire",
+  "tags": ["brat-e2e", "cheap", "trigger"],
+  "fixture": "logic-only",
+  "arms": ["with"],
+  "prompt": "add vitest unit tests for the discount rules in src/pricing.js: 10% over 1000, members get 5% more, never more than 15%. plan only, no files yet.",
+  "graders": [
+    { "name": "e2e skill not loaded", "type": "tool_used", "tool": "Skill", "input": "brat-e2e", "min": 0, "max": 0 },
+    { "name": "plans unit tests, no browser", "type": "judge", "target": "all", "criteria": "PASS if the plan covers the discount edge cases with unit tests against the pricing function (Vitest or similar) and does not propose browser end-to-end tests for them. FAIL otherwise." }
+  ]
+}
