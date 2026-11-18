@@ -5,6 +5,10 @@ const path = require("node:path");
 const os = require("node:os");
 const { runCase } = require("../run-case.cjs");
 
+// A throwaway value for redaction tests, generated per run so secret scanners never see a
+// hard-coded password in the repo.
+const fakeSecret = () => `fake-${require("node:crypto").randomBytes(6).toString("hex")}`;
+
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "demo runner "));
   t.after(() => {
@@ -249,14 +253,15 @@ test("progress log streams phases and captions, and a scrubbed failure reason", 
     assert.match(text, want);
   assert.equal((text.match(/ STEP /g) || []).length, 1, "hiding a caption is not a step");
 
-  process.env.DEMO_TEST_PASSWORD = "hunter2-secret";
+  const fakePassword = fakeSecret(); // made at run time: no password-like literal in the repo
+  process.env.DEMO_TEST_PASSWORD = fakePassword;
   t.after(() => { delete process.env.DEMO_TEST_PASSWORD; });
-  f.config.run = async () => { throw new Error("login failed for hunter2-secret as Jane Doe\nsecond line\nthird line"); };
+  f.config.run = async () => { throw new Error(`login failed for ${fakePassword} as Jane Doe\nsecond line\nthird line`); };
   f.config.redact = { text: ["Jane Doe"] };
   await assert.rejects(runCase(f.config, { ...f.options, retake: true }));
   const failed = fs.readFileSync(path.join(f.root, "final.progress.log"), "utf8");
   assert.match(failed, / FAIL recording: login failed for \[redacted\] as \[redacted\] \| second line\n/);
-  assert.ok(!failed.includes("hunter2") && !failed.includes("Jane") && !failed.includes("third line"));
+  assert.ok(!failed.includes(fakePassword) && !failed.includes("Jane") && !failed.includes("third line"));
 });
 
 test("failure text hides redact.text in any case, built-in PII patterns and login env values", async t => {
@@ -283,13 +288,14 @@ test("CLI exits even when setup leaves a handle open, with a readable reason", t
     setup: async () => { setInterval(() => {}, 1000); throw new Error("select did not stick for " + process.env.DEMO_PASSWORD); },
   };`);
   const started = Date.now();
+  const fakePassword = fakeSecret();
   const result = spawnSync(process.execPath, [path.join(__dirname, "..", "run-case.cjs"), caseFile],
-    { encoding: "utf8", timeout: 20000, env: { ...process.env, DEMO_PASSWORD: "s3cret-pw" } });
+    { encoding: "utf8", timeout: 20000, env: { ...process.env, DEMO_PASSWORD: fakePassword } });
   assert.equal(result.error, undefined, "runner must exit by itself");
   assert.ok(Date.now() - started < 15000);
   assert.equal(result.status, 1);
   assert.match(result.stderr, /case failed: select did not stick for \[redacted\]/);
-  assert.ok(!result.stderr.includes("s3cret-pw"));
+  assert.ok(!result.stderr.includes(fakePassword));
   assert.match(fs.readFileSync(path.join(root, "out", "final.progress.log"), "utf8"), / FAIL setup: select did not stick/);
 });
 
