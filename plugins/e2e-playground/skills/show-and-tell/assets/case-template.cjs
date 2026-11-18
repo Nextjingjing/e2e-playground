@@ -3,13 +3,17 @@
 // node <skill>/scripts/run-case.cjs ./case.cjs --setup-only   # rehearse setup, no take used
 // node <skill>/scripts/run-case.cjs ./case.cjs                # background, then:
 // node <skill>/scripts/watch-case.cjs <output .mp4>            # watcher: STEP lines, exits on DONE/FAIL/DEAD
+// Takes on one machine run one at a time (QUEUE lines while waiting). A take with no progress
+// line or kit call for stallSeconds (default 300) stops itself, e.g. when stuck on a DB lock.
 module.exports = {
   projectDir: ".", // folder containing node_modules/playwright or @playwright/test
   baseURL: "http://127.0.0.1:3000",
   startUrl: "/forklift",
   output: "demo-out/send-to-sorting.mp4",
   title: { tag: "Demo", title: "Send to Sorting", lines: ["One order moves out of the waiting queue"] },
-  music: false, // opt in only when requested; no numpy needed for a silent clip
+  // music: "cozy" by default (warm lo-fi); "calm" = no drums, false = none. Ask only if the user wants other music.
+  // clickSound: false drops the soft click at every real click (on by default). Both need numpy.
+  // theme: { accent: "#AF52DE" }, // only if the user asks; by default the colour is picked to stand out from the app
   redact: { selectors: [".user-badge"] }, // add names/identifiers from environment, never literals
 
   // Optional setup({ log }): prepare fresh test data off camera through supported app facilities.

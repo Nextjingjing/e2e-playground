@@ -1,7 +1,7 @@
 """Finish demo-kit recordings: cut dead time, put the title card first, add music.
 
 usage:
-  python post.py finish <case.webm> <out.mp4> [--card card.webm] [--music] [--seed N]
+  python post.py finish <case.webm> <out.mp4> [--card card.webm] [--music-style cozy|calm] [--no-music] [--no-clicks] [--seed N]
                      [--times t1 t2 ...] [--width 1280] [--force]
                      # edit + one review sheet + resumable OUT.job.json; silent by default
   python post.py one <case.webm> <out.mp4> [--card card.webm] [--seed N]
@@ -19,7 +19,7 @@ Dead time, two sources:
     to --idle-keep seconds (sped up, not cut, so the viewer still sees it happen);
   * stretches where the picture does not change for --freeze seconds (ffmpeg freezedetect)
     -> squeezed to --freeze-keep seconds. Highlights pulse, so they are never "frozen".
-Needs ffmpeg/ffprobe on PATH and numpy (for the music).
+Needs ffmpeg/ffprobe on PATH and numpy (music and click sounds, both on by default).
 """
 import argparse
 import contextlib
@@ -35,6 +35,7 @@ import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 FPS = 30
+CARD_XFADE = 0.7  # the title card dissolves into the first frames of the app, no hard cut
 
 
 VERBOSE = os.environ.get("POST_VERBOSE") == "1"
@@ -127,10 +128,11 @@ def finish(a):
             job = json.load(f)
         if not isinstance(job, dict):
             raise ValueError("job checkpoint must be an object")
-    engine = [__file__] + ([os.path.join(HERE, "gen_music.py")] if not a.no_music else [])
+    engine = [__file__, os.path.join(HERE, "sfx.py")] + ([os.path.join(HERE, "gen_music.py")] if not a.no_music else [])
     key = {"sources": {p: fingerprint(p) if os.path.exists(p) else None for p in sources},
            "engine": [fingerprint(p) for p in engine],
-           "options": [a.seed, a.idle_keep, a.freeze, a.freeze_keep, a.no_music]}
+           "options": [a.seed, a.idle_keep, a.freeze, a.freeze_keep, a.no_music, getattr(a, "no_clicks", False)]
+           + ([] if a.no_music else [a.music_style])}
     previous = job.get("edit", {})
     cached = (not a.force and key == previous.get("key") and os.path.isfile(a.out)
               and fingerprint(a.out) == previous.get("outputFingerprint"))
@@ -142,6 +144,8 @@ def finish(a):
             with contextlib.redirect_stdout(io.StringIO()):
                 one(edit_args)
             os.replace(edit_args.out, a.out)
+            if os.path.exists(clicks_file(edit_args.out)):
+                os.replace(clicks_file(edit_args.out), clicks_file(a.out))
     output_fp = fingerprint(a.out)
     seconds = duration(a.out)
     # Commit the completed render before sheet extraction, which may fail independently.
@@ -252,6 +256,12 @@ def start_of(marks):
     return max(0.0, starts[0] - 0.1) if starts else 0.0
 
 
+def end_of(marks, total):
+    """A title card's "end" mark (just after its text has gone), else the whole clip."""
+    ends = [m["t"] for m in marks if m.get("kind") == "end"]
+    return min(total, ends[-1]) if ends else total
+
+
 def freezes(video, start, min_secs):
     """Still stretches (seconds from the start of the file)."""
     proc = subprocess.run(
@@ -327,17 +337,28 @@ def plan(total, start, idle, frozen, idle_keep, freeze_keep):
     return [s for s in segs if s[1] - s[0] > 0.05]
 
 
-def render(inputs, out):
-    """inputs: [(file, [(a, b, speed), ...])] -> one silent h264 file, segments in order."""
+def render(inputs, out, xfade=0.0):
+    """inputs: [(file, [(a, b, speed), ...])] -> one silent h264 file, segments in order.
+    xfade > 0: the first input (the title card) dissolves into the rest over that many seconds."""
     args, parts, n = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error"], [], 0
     for i, (path, _) in enumerate(inputs):
         args += ["-i", path]
+    first = 0
     for i, (_, segs) in enumerate(inputs):
         for a, b, speed in segs:
             parts.append(f"[{i}:v]trim=start={a:.3f}:end={b:.3f},setpts=(PTS-STARTPTS)/{speed:.4f},"
                          f"fps={FPS},format=yuv420p[v{n}]")
             n += 1
-    graph = ";".join(parts) + ";" + "".join(f"[v{k}]" for k in range(n)) + f"concat=n={n}:v=1:a=0[out]"
+        if i == 0:
+            first = n
+    card_secs = sum((b - a) / s for a, b, s in inputs[0][1]) if inputs else 0
+    if xfade > 0 and len(inputs) > 1 and 0 < first < n and card_secs > xfade + 0.2:
+        join = lambda ks, label: "".join(f"[v{k}]" for k in ks) + f"concat=n={len(ks)}:v=1:a=0,settb=AVTB[{label}]"
+        offset = card_secs - xfade - 1 / FPS  # stay inside the card's last frame
+        graph = ";".join(parts) + ";" + join(range(first), "card") + ";" + join(range(first, n), "rest") + \
+            f";[card][rest]xfade=transition=fade:duration={xfade:.3f}:offset={offset:.3f}[out]"
+    else:
+        graph = ";".join(parts) + ";" + "".join(f"[v{k}]" for k in range(n)) + f"concat=n={n}:v=1:a=0[out]"
     script = out + ".filter.txt"
     with open(script, "w", encoding="utf-8") as f:
         f.write(graph)
@@ -346,24 +367,47 @@ def render(inputs, out):
     os.remove(script)
 
 
-def add_music(video, out, seed, music=True):
-    if not music:
+def add_music(video, out, seed, music=True, style="cozy", clicks=()):
+    """Music bed and click sounds (sfx.py) muxed onto the silent render."""
+    if not music and not clicks:
         os.replace(video, out)
         return
-    wav = out + ".music.wav"
-    run([sys.executable, os.path.join(HERE, "gen_music.py"), wav, f"{duration(video):.2f}", str(seed)])
-    run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", video, "-i", wav,
-         "-filter:a", "volume=0.55", "-c:v", "copy", "-c:a", "aac", "-b:a", "160k",
-         "-shortest", "-movflags", "+faststart", out])
-    os.remove(wav)
-    os.remove(video)
+    secs = f"{duration(video):.2f}"
+    wav, bed = out + ".music.wav", out + ".sound.wav"
+    sound = [sys.executable, os.path.join(HERE, "sfx.py"), bed, secs]
+    if music:
+        run([sys.executable, os.path.join(HERE, "gen_music.py"), wav, secs, str(seed), style])
+        sound += ["--music", wav]
+    if clicks:
+        sound += ["--clicks"] + [f"{t:.3f}" for t in clicks]
+    run(sound)
+    run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", video, "-i", bed,
+         "-c:v", "copy", "-c:a", "aac", "-b:a", "160k", "-shortest", "-movflags", "+faststart", out])
+    for f in (wav, bed, video):
+        if os.path.exists(f):
+            os.remove(f)
+
+
+def clicks_file(video):
+    """Click times of a finished clip, kept beside it so `concat` can lay them again."""
+    return os.path.splitext(video)[0] + ".clicks.json"
+
+
+def edited_time(t, segs, offset=0.0):
+    """Raw recording time -> time in the edited video (None if cut away)."""
+    acc = offset
+    for a, b, speed in segs:
+        if a <= t < b:
+            return acc + (t - a) / speed
+        acc += (b - a) / speed
+    return None
 
 
 def one(a):
     inputs = []
     if a.card:
         cm = load_marks(a.card)
-        inputs.append((a.card, [(start_of(cm), duration(a.card), 1.0)]))
+        inputs.append((a.card, [(start_of(cm), end_of(cm, duration(a.card)), 1.0)]))
     marks = load_marks(a.video)
     total = duration(a.video)
     start = start_of(marks)
@@ -375,16 +419,22 @@ def one(a):
           f"{len(idle)} idle + {len(frozen)} still spans")
     inputs.append((a.video, segs))
     silent = a.out + ".silent.mp4"
-    render(inputs, silent)
-    add_music(silent, a.out, a.seed, not a.no_music)
+    card_secs = sum((y - x) / s for x, y, s in inputs[0][1]) if a.card else 0.0
+    xfade = CARD_XFADE if a.card and card_secs > CARD_XFADE + 0.2 else 0.0
+    render(inputs, silent, xfade=xfade)
+    clicks = [] if getattr(a, "no_clicks", False) else         [e for e in (edited_time(m["t"], segs, card_secs - xfade) for m in marks if m.get("kind") == "click") if e is not None]
+    add_music(silent, a.out, a.seed, not a.no_music, a.music_style, clicks)
+    with open(clicks_file(a.out), "w", encoding="utf-8") as f:
+        json.dump([round(t, 3) for t in clicks], f)
     print(f"wrote {a.out} ({duration(a.out):.1f}s)")
 
 
 def card(a):
     """A title card on its own (intro/outro of the combined video)."""
     silent = a.out + ".silent.mp4"
-    render([(a.card, [(start_of(load_marks(a.card)), duration(a.card), 1.0)])], silent)
-    add_music(silent, a.out, a.seed, not a.no_music)
+    cm = load_marks(a.card)
+    render([(a.card, [(start_of(cm), end_of(cm, duration(a.card)), 1.0)])], silent)
+    add_music(silent, a.out, a.seed, not a.no_music, a.music_style)
     print(f"wrote {a.out} ({duration(a.out):.1f}s)")
 
 
@@ -392,7 +442,14 @@ def concat(a):
     inputs = [(c, [(0.0, duration(c), 1.0)]) for c in a.clips]
     silent = a.out + ".silent.mp4"
     render(inputs, silent)
-    add_music(silent, a.out, a.seed, not a.no_music)
+    # one continuous music bed for the whole video; each clip's clicks shifted to where it starts
+    clicks, offset = [], 0.0
+    for c in a.clips:
+        if not a.no_clicks and os.path.exists(clicks_file(c)):
+            with open(clicks_file(c), encoding="utf-8") as f:
+                clicks += [offset + t for t in json.load(f)]
+        offset += duration(c)
+    add_music(silent, a.out, a.seed, not a.no_music, a.music_style, clicks)
     print(f"wrote {a.out} ({duration(a.out):.1f}s)")
 
 
@@ -407,7 +464,10 @@ def main():
     f.add_argument("--idle-keep", type=float, default=0.6)
     f.add_argument("--freeze", type=float, default=2.5)
     f.add_argument("--freeze-keep", type=float, default=1.2)
-    f.add_argument("--music", dest="no_music", action="store_false", default=True)
+    f.add_argument("--music", dest="no_music", action="store_false", default=False)  # on by default; kept for old callers
+    f.add_argument("--no-music", dest="no_music", action="store_true")
+    f.add_argument("--no-clicks", action="store_true")
+    f.add_argument("--music-style", choices=["cozy", "calm"], default="cozy")
     f.add_argument("--times", nargs="*", type=float, default=[])
     f.add_argument("--width", type=int, default=1280)
     f.add_argument("--force", action="store_true")
@@ -420,16 +480,21 @@ def main():
     o.add_argument("--freeze", type=float, default=2.5)
     o.add_argument("--freeze-keep", type=float, default=1.2)
     o.add_argument("--no-music", action="store_true")
+    o.add_argument("--no-clicks", action="store_true")
+    o.add_argument("--music-style", choices=["cozy", "calm"], default="cozy")
     k = sub.add_parser("card")
     k.add_argument("card")
     k.add_argument("out")
     k.add_argument("--seed", type=int, default=3)
     k.add_argument("--no-music", action="store_true")
+    k.add_argument("--music-style", choices=["cozy", "calm"], default="cozy")
     c = sub.add_parser("concat")
     c.add_argument("out")
     c.add_argument("clips", nargs="+")
     c.add_argument("--seed", type=int, default=11)
     c.add_argument("--no-music", action="store_true")
+    c.add_argument("--no-clicks", action="store_true")
+    c.add_argument("--music-style", choices=["cozy", "calm"], default="cozy")
     s = sub.add_parser("sheet")
     s.add_argument("video")
     s.add_argument("out")

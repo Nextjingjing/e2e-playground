@@ -12,7 +12,25 @@ the story and checking the proof.
 ## Default: one case, one thread, one command
 
 Use this path for a short demo. Do not create subagents, a combined video or separate
-HANDOFF/FLOWS/STATUS files for one case. Music is opt-in; captions, title and proof remain.
+HANDOFF/FLOWS/STATUS files for one case. Captions, title, proof, music and click sounds remain.
+
+**Look and sound.** These are defaults. Change anything the user asks for, in the case's
+`theme`, `font` and `music` fields.
+- **Apple style.** The font is SF / Segoe UI Variable, with a Thai fallback. The intro is
+  dark, with soft drifting colour light and a glass tag pill.
+- **The intro moves.** Title words arrive out of a blur. Then each line appears on its own,
+  3 per page. Long text is never shown all at once. The intro then dissolves into the app.
+- **Overlays.** Captions are glass pills, highlights are rings with label pills, and the
+  cursor is a macOS arrow. The highlight colour is picked from Apple's palette, away from the
+  app's own colours (an orange app gets blue). `theme.accent` sets it explicitly.
+- **Music is on**: warm lo-fi ("cozy"), a different tune per `seed`. Ask only when the user
+  wants other music: `music: "calm"` (no drums), or `music: false` for none.
+- **Click sounds**: a soft click at every real click, in time with the ripple.
+  `clickSound: false` turns them off.
+- **No voice-over** unless the user agrees to it. Ask first.
+- **Nothing extra unless asked.** Do not add animation or generated clips beyond the built-in
+  intro (no motion graphics, AI-generated footage or custom transitions). When the user asks
+  for them, do it.
 
 0. **Storyboard first: show what the video will be before any work (≈2 min, no tools).**
    The user must know what they will get and how long it takes before you scout or touch
@@ -98,7 +116,13 @@ because its process never exited, so no "finished" notice came.
   It exits on `DONE` (0), on `FAIL <phase>: <reason>` (1), or on `DEAD` (2), which means the
   runner vanished without a result. It prints `STALL` when nothing new arrives for
   `--stall` s. While a clip is encoding, `EDIT still encoding (Ns)` arrives every minute.
-  Those lines are normal.
+  Those lines are normal. So is `QUEUE waiting for the take of pid N (<other>.mp4)` once a
+  minute: takes on one machine run one at a time, and this one starts when that one ends.
+- A take that shows no progress for 300 s (case field `stallSeconds`) during setup,
+  recording or verify stops itself with `FAIL <phase>: no progress for Ns …; last: <line>`.
+  No progress means no progress line and no kit call in that time. The usual cause is the
+  app or `setup()` waiting on a database lock that another process holds. Raise
+  `stallSeconds` only for a step that is really that slow and that logs nothing.
 - Do not end a turn with "I'll check when it finishes" unless the watcher is confirmed
   running. If starting it fails, fix that first, e.g. load the monitor tool's schema.
 - On `FAIL` or `STALL`, act now. Read the reason, then `take-N/fail.png` if listed (`SHOT`),
@@ -123,6 +147,15 @@ because its process never exited, so no "finished" notice came.
   so the viewer saw an orange box around nothing. `highlight`, `highlightText` and `click`
   now check what is really on top. They wait ≤ 3 s for a closing modal or toast, then fail
   and name what covers the target. In `run()`, close the modal before pointing behind it.
+- **Parallel takes deadlocked, silently.** Cases filmed at the same time against one app
+  and database locked each other. Nothing failed, so the takes waited and nobody was told.
+  Now takes on one machine queue for each other, and a take that makes no progress fails
+  itself with the phase and last step. Work on several cases in parallel only up to the
+  storyboard. Do not run tests or scripts against the same database during a take.
+- **Cursor on the proof.** The ring cursor was centred on its target and stayed there after
+  clicks, and `highlightText` parked it in the middle of the highlighted text. It is now an
+  arrow (the tip is the click point). It fades after a click and hides under a highlight.
+  Do not move the mouse onto the result to point at it. Use `highlight` or `highlightText`.
 - **Budget bypass.** Setup failures used up both takes. The agent then deleted the job file
   3× to reset the counter. Setup failures (and killed setups) no longer cost a take, and a
   stale lock clears itself. Never reset a counter.
@@ -156,12 +189,14 @@ python <skill>/scripts/post.py finish <case.webm> <out.mp4> --card <card.webm>
 
 This trims setup, squeezes waits/still spans, prepends the title, makes one sheet and
 prints one JSON summary. Unchanged inputs/settings/output reuse the render and sheet.
-`--music --seed 21` adds music; `--times 3 12 24` chooses moments in the **edited** timeline;
-`--force` re-edits without recording actions. Full options: `references/automation.md`.
-Existing `one`, `sheet`, `seen`, `card`, `cover` and `concat` commands still work.
+Music (cozy) and click sounds are on. `--seed 21` picks another tune, `--music-style calm`
+drops the drums, and `--no-music`/`--no-clicks` remove them. `--times 3 12 24` chooses moments
+in the **edited** timeline, and `--force` re-edits without recording the actions again. Full
+options: `references/automation.md`. The `one`, `sheet`, `seen`, `card`, `cover` and `concat`
+commands still work.
 
-Needs Node + Playwright in `projectDir`, Python and ffmpeg/ffprobe on PATH. Only music needs
-numpy. The kit already applies human-yardstick pacing defaults; read that skill when
+Needs Node + Playwright in `projectDir`, Python and ffmpeg/ffprobe on PATH. Music and click
+sounds need numpy. The kit already applies human-yardstick pacing defaults; read that skill when
 changing timing/size. Reuse `demo-kit.cjs` helpers instead of implementing overlays again.
 
 ## Expand only when needed

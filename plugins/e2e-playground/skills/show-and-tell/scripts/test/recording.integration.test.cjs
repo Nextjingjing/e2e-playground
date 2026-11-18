@@ -10,6 +10,11 @@ const { promisify } = require("node:util");
 const execFile = promisify(require("node:child_process").execFile);
 const runner = path.resolve(__dirname, "../run-case.cjs");
 
+// Takes queue machine-wide: keep these runs (spawned with this env) out of the user's real queue.
+const queueDir = fs.mkdtempSync(path.join(os.tmpdir(), "demo queue "));
+process.env.DEMO_QUEUE_DIR = queueDir;
+process.on("exit", () => fs.rmSync(queueDir, { recursive: true, force: true }));
+
 const projectDir = path.resolve(__dirname, "../terminal");
 let browserAvailable = false;
 try {

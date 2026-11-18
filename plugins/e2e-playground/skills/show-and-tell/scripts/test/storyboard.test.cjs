@@ -6,6 +6,11 @@ const os = require("node:os");
 const { storyboard, clock } = require("../storyboard.cjs");
 const { runCase } = require("../run-case.cjs");
 
+// Takes queue machine-wide: keep these runs out of the user's real queue.
+const queueDir = fs.mkdtempSync(path.join(os.tmpdir(), "demo queue "));
+process.env.DEMO_QUEUE_DIR = queueDir;
+process.on("exit", () => fs.rmSync(queueDir, { recursive: true, force: true }));
+
 function tmp(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "demo storyboard "));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));

@@ -10,8 +10,11 @@ node <skill>/scripts/run-case.cjs <work>/case.cjs
 ```
 
 The runner uses the existing kit for title, cursor, real input, captions, redaction and
-wait marks. It then runs cached editing and sheet extraction. Default is silent; add
-`music: true` to request the synthesized bed. `DEMO_PYTHON` selects a Python executable.
+wait marks. It then runs cached editing and sheet extraction. The finished video has a
+synthesized cozy lo-fi bed and a soft click sound at every real click. `music: "calm"` or
+`music: false` changes the bed, and `clickSound: false` drops the clicks. Both need numpy.
+`DEMO_PYTHON` selects a Python executable. The title card dissolves into the first frames of
+the app (0.7 s).
 
 Case fields:
 
@@ -25,7 +28,10 @@ Case fields:
 | `login(page)` | optional off-camera login; read credentials from environment |
 | `verify()` | optional read-only outcome check; returns exactly `true` to proceed |
 | `redact` | extra sensitive text/selectors; stays enabled |
-| `music`, `seed`, `reviewTimes` | optional music and sheet timestamps in the edited timeline |
+| `music`, `seed`, `reviewTimes` | music: `"cozy"` warm lo-fi (default, also `true`), `"calm"` (no drums), `false` (none); seed picks key/chords/tempo; sheet timestamps in the edited timeline |
+| `clickSound` | `false` drops the soft click heard at every real click (on by default) |
+| `theme` | look of cards and overlays (Apple style by default): `accent` (highlight/label colour; default picked away from the app's colours), `dark: false` (light intro), `background`, `colors` (4 intro light colours) |
+| `stallSeconds` | seconds without progress before a take stops itself (default 300) |
 | `view`, `font` | optional existing kit settings; normally keep defaults |
 
 Do not put secrets or personal identifiers in the case file, title or notes. Load extra
@@ -60,7 +66,7 @@ Limits:
 
 ## Progress, watching and failures
 
-Every run rewrites `<stem>.progress.log` with timestamped lines: `RUN pid=… at=…`, `TAKE`,
+Every run rewrites `<stem>.progress.log` with timestamped lines: `RUN pid=… at=…`, `QUEUE` (waiting for another take), `TAKE`,
 `SETUP …`, `REC`, `STEP <caption>` for each caption, `VERIFY`, `EDIT`, `SHOT <fail.png>`, and finally
 `DONE …` or `FAIL <phase>: <reason>`. While editing, `EDIT still encoding (Ns)` is added every
 60 s, for up to 20 min. The reason is the error's first two lines, without colour codes.
@@ -87,6 +93,20 @@ watching. It can be started before, with or after the runner, and restarted at a
 The runner always exits itself, even when case code leaves a browser or socket open. Before
 this fix, a `setup()` that opened its own browser and then threw kept Node alive for hours. On a
 failure during recording it saves `take-N/fail.png` from the filmed page.
+
+Nothing in a take waits forever:
+- **One take at a time per machine.** Setup, title, recording and verify hold a machine-wide
+  turn. The file is `~/.show-and-tell/queue/take.lock`; `DEMO_QUEUE_DIR` moves it. A second
+  runner, including `--setup-only`, writes `QUEUE waiting for the take of pid N (<out>.mp4)`
+  once a minute and starts when the turn is free. It gives up after 45 min with
+  `FAIL queue: waited … min`. The turn is handed on before editing. A turn whose runner is
+  gone is taken over, so never delete it by hand. A runner stopped while queued used no take.
+- **No progress for `stallSeconds` (300 s) stops the take.** Progress is a progress line,
+  `setup()`'s `log()`, or any kit call (`demo.*`) starting or ending. Setup, title, recording
+  and verify each fail with `FAIL <phase>: no progress for Ns in <phase>; last: <line>`. During
+  recording, `fail.png` then shows the screen it was stuck on. A hung setup counts as a setup
+  failure, so the take keeps its number. Give a long setup `log()` lines rather than a larger
+  `stallSeconds`.
 
 `demo.click`, `demo.highlight` and `demo.highlightText` check what is really on top at the
 target. A modal, backdrop, toast or sticky bar counts as a cover. The check sees inside
@@ -149,7 +169,8 @@ from an older runner with no pid inside is reported. Ask the user about it.
 
 ```sh
 python <skill>/scripts/post.py finish raw.webm final.mp4 --card title.webm
-python <skill>/scripts/post.py finish raw.webm final.mp4 --card title.webm --music --seed 21
+python <skill>/scripts/post.py finish raw.webm final.mp4 --card title.webm --seed 21 --music-style calm
+python <skill>/scripts/post.py finish raw.webm final.mp4 --card title.webm --no-music --no-clicks
 python <skill>/scripts/post.py finish raw.webm final.mp4 --times 3 12 24
 ```
 

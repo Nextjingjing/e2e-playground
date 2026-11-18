@@ -5,6 +5,13 @@ const path = require("node:path");
 const os = require("node:os");
 const { runCase } = require("../run-case.cjs");
 
+// Takes queue machine-wide, one at a time: keep this file's runs (and the CLI runs it spawns)
+// out of the user's real queue.
+const queueDir = fs.mkdtempSync(path.join(os.tmpdir(), "demo queue "));
+process.env.DEMO_QUEUE_DIR = queueDir;
+process.on("exit", () => fs.rmSync(queueDir, { recursive: true, force: true }));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
 // A throwaway value for redaction tests, generated per run so secret scanners never see a
 // hard-coded password in the repo.
 const fakeSecret = () => `fake-${require("node:crypto").randomBytes(6).toString("hex")}`;
@@ -104,6 +111,26 @@ test("concurrent use of one output is refused before setup", async t => {
   fs.writeFileSync(path.join(f.root, "final.job.json.lock"), "busy");
   await assert.rejects(runCase(f.config, f.options), /locked/);
   assert.deepEqual(f.events, []);
+});
+
+test("music is off, cozy (true) or calm; anything else is refused before setup", async t => {
+  const f = fixture(t);
+  f.config.music = "jazz";
+  await assert.rejects(runCase(f.config, f.options), /music must be false, true \(cozy\), "cozy" or "calm"/);
+  f.config.music = undefined;
+  f.config.clickSound = "loud";
+  await assert.rejects(runCase(f.config, f.options), /clickSound must be true or false/);
+  assert.deepEqual(f.events, []);
+});
+
+test("editing gets cozy music and click sounds unless the case turns them off", () => {
+  const { editArgs } = require("../run-case.cjs");
+  const record = { video: "case.webm", card: "card.webm" };
+  const args = config => editArgs({ ...config }, record, "out.mp4").slice(2).join(" ");
+  assert.equal(args({}), "case.webm out.mp4 --card card.webm --music-style cozy");
+  assert.equal(args({ music: true }), "case.webm out.mp4 --card card.webm --music-style cozy");
+  assert.equal(args({ music: "calm" }), "case.webm out.mp4 --card card.webm --music-style calm");
+  assert.equal(args({ music: false, clickSound: false, seed: 4 }), "case.webm out.mp4 --card card.webm --no-music --no-clicks --seed 4");
 });
 
 test("redaction cannot be disabled by the runner", async t => {
@@ -313,6 +340,84 @@ test("CLI error line applies the case's redaction, not only env secrets", t => {
   assert.equal(result.status, 1);
   assert.match(result.stderr, /case failed: no row for \[redacted\] \(\[redacted\]\)/);
   assert.ok(!/jane|corp\.com/i.test(result.stderr), result.stderr);
+});
+
+// 2026-11-18: cases recorded in parallel against one app and database deadlocked. Nothing
+// failed, so the takes just waited and nobody was told.
+
+test("a setup that never finishes fails after stallSeconds of silence and keeps the take", async t => {
+  const f = fixture(t);
+  f.config.setup = async ({ log }) => { log("queue PM9 created"); await new Promise(() => {}); }; // e.g. blocked on a DB lock
+  f.config.stallSeconds = 0.3;
+  await assert.rejects(runCase(f.config, f.options), /no progress for \d+s in setup; last: SETUP queue PM9 created/);
+  const text = fs.readFileSync(path.join(f.root, "final.progress.log"), "utf8");
+  assert.match(text, / FAIL setup: no progress for \d+s in setup/);
+  assert.ok(!fs.existsSync(path.join(f.root, "final.job.json.lock")));
+  assert.deepEqual(fs.readdirSync(queueDir), [], "the machine turn is given back");
+  f.config.setup = async () => {};
+  await runCase(f.config, f.options);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(f.root, "final.job.json"), "utf8")).record.attempts, 1, "a hung setup filmed nothing");
+});
+
+test("a take stuck on the app fails with a screenshot; steady kit calls count as progress", async t => {
+  const f = fixture(t);
+  const startSession = f.kit.startSession;
+  f.kit.startSession = async options => ({ ...(await startSession(options)),
+    page: { screenshot: async ({ path: file }) => fs.writeFileSync(file, "png") },
+    demo: { caption: async () => {}, sleep, waitApp: () => new Promise(() => {}) } });
+  f.config.stallSeconds = 0.3;
+  // 8 x 100 ms is longer than the limit, but something happens every 100 ms: not stuck.
+  f.config.run = async ({ demo }) => { for (let i = 0; i < 8; i++) await demo.sleep(100); };
+  await runCase(f.config, f.options);
+  f.config.run = async ({ demo }) => { await demo.caption("Scan the pallet"); await demo.waitApp(async () => {}, "wait for 8/8"); };
+  await assert.rejects(runCase(f.config, { ...f.options, retake: true }), /no progress for \d+s in recording; last: STEP 1 Scan the pallet/);
+  const text = fs.readFileSync(path.join(f.root, "final.progress.log"), "utf8");
+  assert.match(text, / SHOT .*fail\.png/);
+  assert.ok(f.events.includes("close"), "the browser is closed");
+});
+
+test("takes on one machine run one at a time: the next waits with QUEUE lines, then starts", async t => {
+  const a = fixture(t), b = fixture(t);
+  let release;
+  a.config.run = () => new Promise(r => { release = r; });
+  const first = runCase(a.config, a.options);
+  while (!release) await sleep(10);
+  const second = runCase(b.config, { ...b.options, queuePollMs: 20, queueNoteMs: 60 });
+  await sleep(250);
+  assert.deepEqual(b.events, [], "the second take has not touched the app yet");
+  const waiting = fs.readFileSync(path.join(b.root, "final.progress.log"), "utf8");
+  assert.ok((waiting.match(new RegExp(` QUEUE waiting for the take of pid ${process.pid} \\(final\\.mp4\\)`, "g")) || []).length >= 2, waiting);
+  release();
+  await first;
+  await second;
+  assert.deepEqual(b.events, ["setup", "card", "open", "action", "finish", "verify", "close", "edit"]);
+});
+
+test("the machine turn of a runner that died is taken over; a live one is waited for only so long", async t => {
+  const f = fixture(t);
+  const gone = require("node:child_process").spawnSync(process.execPath, ["-e", "process.stdout.write(String(process.pid))"], { encoding: "utf8" });
+  fs.writeFileSync(path.join(queueDir, "take.lock"), JSON.stringify({ id: "x", pid: Number(gone.stdout), output: "old.mp4", at: Date.now() }));
+  await runCase(f.config, { ...f.options, setupOnly: true });
+  fs.writeFileSync(path.join(queueDir, "take.lock"), JSON.stringify({ id: "y", pid: process.pid, output: "busy.mp4", at: Date.now() }));
+  t.after(() => fs.rmSync(path.join(queueDir, "take.lock"), { force: true }));
+  await assert.rejects(runCase(f.config, { ...f.options, setupOnly: true, queuePollMs: 20, queueMaxMs: 100 }),
+    new RegExp(`waited \\d+ min for the take of pid ${process.pid} \\(busy\\.mp4\\)`));
+});
+
+test("CLI: a setup stuck forever is reported and the runner exits", t => {
+  const { spawnSync } = require("node:child_process");
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "demo runner cli "));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const caseFile = path.join(root, "case.cjs");
+  fs.writeFileSync(caseFile, `module.exports = {
+    output: "out/final.mp4", baseURL: "http://127.0.0.1:9", title: { title: "T", lines: [] }, stallSeconds: 1,
+    run: async () => {},
+    setup: () => new Promise(() => { setInterval(() => {}, 1000); }),
+  };`);
+  const result = spawnSync(process.execPath, [path.join(__dirname, "..", "run-case.cjs"), caseFile], { encoding: "utf8", timeout: 20000 });
+  assert.equal(result.error, undefined, "runner must exit by itself");
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /case failed: no progress for \d+s in setup/);
 });
 
 test("--storyboard exits 3 when the storyboard is incomplete, like storyboard.cjs", t => {
