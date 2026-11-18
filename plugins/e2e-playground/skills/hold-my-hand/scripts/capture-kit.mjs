@@ -24,13 +24,32 @@ export async function launch({ appPackageJson, time, timezoneId = "UTC", locale 
   return { browser, context, page };
 }
 
+// What a reader would see at the element's centre: null when it is the element (or its
+// child/parent), else "tag#id.class" of what covers it — an open modal, its backdrop, a toast.
+// Our own marks and redaction bars are pointer-events:none, so they are looked through.
+export async function coveredBy(locator) {
+  return locator.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    const hit = el.ownerDocument.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    if (!hit || hit === el || el.contains(hit) || hit.contains(el)) return null;
+    const label = hit.closest && hit.closest("label");
+    if (label && label.control === el) return null;
+    const cls = typeof hit.className === "string" ? hit.className.trim().split(/\s+/).filter(Boolean).slice(0, 2) : [];
+    return hit.tagName.toLowerCase() + (hit.id ? "#" + hit.id : "") + cls.map((c) => "." + c).join("");
+  });
+}
+
 // marks: [{ el: Locator, n?: number, box?: boolean (default true), pos?: "corner" | "left" }]
+// Refuses an element hidden behind a modal/backdrop/toast: a badge on something the reader
+// cannot see sends them to the wrong place. Close the modal first, or mark what is inside it.
 export async function annotate(page, marks) {
   const rects = [];
   for (const m of marks) {
     await m.el.scrollIntoViewIfNeeded();
     const b = await m.el.boundingBox();
     if (!b) throw new Error(`annotate: element for badge ${m.n ?? "-"} is not visible`);
+    const cover = await coveredBy(m.el);
+    if (cover) throw new Error(`annotate: element for badge ${m.n ?? "-"} is behind ${cover}; close the modal/popup first or mark something inside it`);
     rects.push({ ...b, n: m.n, box: m.box !== false, left: m.pos === "left" });
   }
   await page.evaluate(({ rects, accent }) => {
@@ -58,7 +77,7 @@ export async function annotate(page, marks) {
         b.dataset.annot = "1";
         b.textContent = String(r.n);
         const [x, y] = spot(r);
-        b.style.cssText = `position:fixed;left:${x}px;top:${y}px;width:28px;height:28px;border-radius:50%;background:${accent};color:#fff;display:flex;align-items:center;justify-content:center;font:700 15px system-ui;box-shadow:0 0 0 2px #fff,0 3px 8px rgba(0,0,0,.35);z-index:99999`;
+        b.style.cssText = `position:fixed;left:${x}px;top:${y}px;width:28px;height:28px;border-radius:50%;background:${accent};color:#fff;display:flex;align-items:center;justify-content:center;font:700 15px system-ui;box-shadow:0 0 0 2px #fff,0 3px 8px rgba(0,0,0,.35);z-index:99999;pointer-events:none`;
         document.body.append(b);
       }
     }
