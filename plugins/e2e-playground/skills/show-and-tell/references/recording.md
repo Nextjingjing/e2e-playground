@@ -32,6 +32,10 @@ await demo.card({ tag: "Case 1", title: "Fill the slot", lines: ["Scan any palle
 await s.finish();
 ```
 
+Point only at what the viewer can see. `demo.highlight()`/`highlightText()` refuse a target
+behind an open modal, backdrop or toast (after a ≤ 3 s wait for it to close): close the
+modal in the script first, or point at the copy inside it.
+
 Point at the part that matters, never at everything. `demo.highlight()` refuses a box over
 half the screen — a frame round a whole terminal, log or page points at nothing. Inside big
 elements use `demo.highlightText("42 passed", "label")` (or a RegExp, `{ line: true }` for the

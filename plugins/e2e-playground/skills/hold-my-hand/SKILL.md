@@ -85,6 +85,9 @@ Copy `scripts/capture-kit.mjs` next to your capture script and import its helper
 `launch()`, `annotate(page, marks)` (outline + numbered badge; `pos: "left"` when the badge
 would cover text), `clearMarks`, `around(page, locators, pad)` for a tight clip, and
 `shot(page, outDir, name, clip)`. `assets/example-capture.mjs` shows a complete script.
+`annotate` refuses an element hidden behind an open modal, backdrop or toast. The error
+names what covers it. Close the modal in the script first, or mark what is inside it: a
+badge on something the reader cannot see sends them to the wrong place.
 
 - **Never point captures at a real database.** Stub every API call with Playwright
   `page.route`: catch-all first (`**/api/** → { success: true, data: [] }`), then specific

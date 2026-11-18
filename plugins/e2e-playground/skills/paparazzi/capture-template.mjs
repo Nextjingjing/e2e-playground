@@ -35,8 +35,50 @@ await page.addStyleTag({ content: "*,*::before,*::after{animation:none!important
 // --- Plain overview shot ---
 await page.screenshot({ path: `${assets}/overview.png`, fullPage: true });
 
+// --- Never mark what the reader cannot see ---
+// null when the element itself (or its child/parent, light or shadow DOM) is on top at its
+// centre, else "tag#id.class" of what covers it (an open modal, its backdrop, a toast). Badges
+// and redaction bars are pointer-events:none, so they are looked through; a pointer-events:none
+// target (a floating label) is made hittable for the probe.
+const coveredBy = (locator) => locator.evaluate((el) => {
+  const doc = el.ownerDocument;
+  const parentOf = (n) => n.assignedSlot || (n.parentNode && n.parentNode.nodeType === 11 && n.parentNode.host) || n.parentNode;
+  const within = (outer, inner) => { for (let n = inner; n; n = parentOf(n)) if (n === outer) return true; return false; };
+  const r = el.getBoundingClientRect();
+  const x = r.left + r.width / 2, y = r.top + r.height / 2;
+  const pick = () => {
+    let hit = doc.elementFromPoint(x, y);
+    while (hit && hit.shadowRoot) { // look inside open shadow roots (web components)
+      const inner = hit.shadowRoot.elementFromPoint(x, y);
+      if (!inner || inner === hit) break;
+      hit = inner;
+    }
+    return hit;
+  };
+  let hit;
+  if (getComputedStyle(el).pointerEvents === "none") {
+    const style = el.getAttribute("style");
+    el.style.setProperty("pointer-events", "auto", "important");
+    try { hit = pick(); } finally {
+      el.getAttribute("style"); // Chrome writes the attribute lazily: sync it now, or it comes back as style=""
+      if (style === null) el.removeAttribute("style"); else el.setAttribute("style", style);
+    }
+  } else hit = pick();
+  if (!hit || within(el, hit) || within(hit, el)) return null;
+  const label = hit.closest && hit.closest("label");
+  if (label && label.control === el) return null;
+  const cls = typeof hit.className === "string" ? hit.className.trim().split(/\s+/).filter(Boolean).slice(0, 2) : [];
+  return hit.tagName.toLowerCase() + (hit.id ? "#" + hit.id : "") + cls.map((c) => "." + c).join("");
+});
+const assertOnTop = async (locator, what) => {
+  const cover = await coveredBy(locator);
+  if (cover) throw new Error(`${what} is behind ${cover}; close the modal/popup first or mark something inside it`);
+};
+
 // --- Outline technique: highlight one region ---
 const outline = async (locator) => {
+  await locator.scrollIntoViewIfNeeded();
+  await assertOnTop(locator, "outline target");
   await locator.evaluate((el) => {
     el.style.boxShadow = "inset 0 0 0 4px #b45309";
     el.style.borderRadius = "8px";
@@ -61,6 +103,11 @@ async function addNumberedBadges(page, steps) {
     const locator = page.locator(step.selector).first();
     if (await locator.count()) await locator.scrollIntoViewIfNeeded();
   }
+  // Check every target before drawing any badge, so a badge never counts as a cover.
+  for (const step of steps) {
+    const locator = page.locator(step.selector).first();
+    if (await locator.count()) await assertOnTop(locator, `badge ${step.number} target (${step.selector})`);
+  }
 
   await page.evaluate((steps) => {
     const addBadge = (rect, number) => {
@@ -70,7 +117,7 @@ async function addNumberedBadges(page, steps) {
       badge.style.cssText = `position:fixed;left:${rect.left - 13}px;top:${rect.top - 13}px;
         width:26px;height:26px;border-radius:50%;background:#b45309;color:#fff;
         display:flex;align-items:center;justify-content:center;font:700 14px system-ui;
-        box-shadow:0 0 0 2px #fff,0 4px 10px rgba(0,0,0,.35);z-index:10000`;
+        box-shadow:0 0 0 2px #fff,0 4px 10px rgba(0,0,0,.35);z-index:10000;pointer-events:none`;
       document.body.append(badge);
     };
     for (const step of steps) {

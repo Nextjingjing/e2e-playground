@@ -146,7 +146,7 @@ const addBadge = (rect, number) => {
   badge.style.cssText = `position:fixed;left:${rect.left - 13}px;top:${rect.top - 13}px;
     width:26px;height:26px;border-radius:50%;background:#b45309;color:#fff;
     display:flex;align-items:center;justify-content:center;font:700 14px system-ui;
-    box-shadow:0 0 0 2px #fff,0 4px 10px rgba(0,0,0,.35);z-index:10000`;
+    box-shadow:0 0 0 2px #fff,0 4px 10px rgba(0,0,0,.35);z-index:10000;pointer-events:none`;
   document.body.append(badge);
 };
 ```
@@ -163,6 +163,13 @@ Rules for badges specifically:
   `rows.find(r => r.querySelector('[selector for the +N element]'))`. Numbering
   a row that doesn't have the thing produces a screenshot with a badge
   pointing at nothing.
+- **Never mark something behind an open modal, backdrop or toast.** The rect
+  is still there, so the badge or outline is drawn, but it points at
+  something the reader cannot see. The template's `outline()` and
+  `addNumberedBadges()` call `assertOnTop()`, which uses `elementFromPoint`
+  at the target's centre. When the target is covered, they throw and name
+  what covers it. Close the modal first, or mark what is inside it. Give your
+  own overlays `pointer-events:none` so they never count as covers.
 - **Only number what's visible in this screenshot.** If step 5 of the prose
   happens on a different page, leave it text-only in the manual rather than
   forcing a badge onto an unrelated element here.
