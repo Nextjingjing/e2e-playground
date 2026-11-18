@@ -10,7 +10,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
-const { readMs } = require("./demo-kit.cjs");
+const { cardPlan } = require("./demo-kit.cjs");
 
 const CALL_BUDGET = 5000;
 const TIME_BUDGET_MS = 20000; // a run() that awaits real timers in a loop must not hang the preview
@@ -119,7 +119,8 @@ function makeFakes(events, deadline = Infinity) {
     async highlightBox(_, label, ms = 2200) { events.push({ kind: "highlight", text: `box${label ? ` — "${label}"` : ""}`, secs: ms / 1000 }); },
     async card(card = {}, ms) {
       const t = [card.tag, card.title, ...(card.lines || [])].filter(Boolean);
-      events.push({ kind: "card", text: `card: ${t.join(" · ")}`, secs: ((ms ?? readMs(t)) + 1400) / 1000 });
+      const plan = cardPlan({ tag: card.tag, title: card.title, lines: card.lines || [] }, { ms });
+      events.push({ kind: "card", text: `card: ${t.join(" · ")}`, secs: (plan.total + plan.exitMs + 1100) / 1000 });
     },
     async waitApp(what, label = "wait") {
       if (typeof what === "function") await what();
@@ -170,7 +171,9 @@ async function storyboard(config, { caseFile = "case.cjs", caseKey = null, baseD
   catch (error) { stopped = error instanceof StoryboardStop ? error.message : `run() threw on the fake page: ${String(error?.message || error).split("\n")[0]}`; }
   finally { clearTimeout(timer); }
   const title = config.title;
-  const titleSecs = (readMs([title.tag, title.title, ...(title.lines || [])].filter(Boolean)) + 1400) / 1000;
+  // the opening card plays its timeline, then dissolves into the app (post.py overlaps 0.7 s)
+  const card = cardPlan({ tag: title.tag, title: title.title, lines: title.lines || [] });
+  const titleSecs = (card.total + card.exitMs) / 1000;
   const list = scenes(events);
   const steps = list.filter(s => s.caption).length;
   const total = titleSecs + list.reduce((sum, s) => sum + s.secs, 0);

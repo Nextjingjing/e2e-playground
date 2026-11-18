@@ -22,7 +22,13 @@ const path = require("path");
 const { redactInit, redactConfig } = require("./redact.cjs");
 const { thaiCells } = require("./terminal/thai.cjs");
 
-const DEFAULT_FONT = "'Leelawadee UI','Noto Sans Thai','Sarabun','Segoe UI','Noto Sans',sans-serif";
+// Apple's system font where there is one (macOS/iOS), its closest look-alikes elsewhere
+// (Segoe UI Variable on Windows 11, Inter), then Thai faces for Thai glyphs. opts.font overrides.
+const DEFAULT_FONT = "-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text','Helvetica Neue','Segoe UI Variable Display','Segoe UI','Inter'," +
+  "'Sukhumvit Set','Leelawadee UI','Noto Sans Thai','Sarabun',sans-serif";
+// Apple system colours (light-mode values: deep enough for white text). The kit picks the first
+// one whose hue is far from the app's own colours, so a highlight never melts into an orange app.
+const ACCENTS = ["#007AFF", "#AF52DE", "#FF2D55", "#5856D6", "#34C759", "#FF9500", "#30B0C7"];
 const DEFAULT_VIEW = { width: 1440, height: 900 };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -48,9 +54,118 @@ function loadPlaywright(projectDir) {
   throw new Error("Playwright not found. Pass opts.projectDir (a folder with node_modules/playwright or @playwright/test).");
 }
 
-// ---------- the opening title card: its own clip, fixed font, no app behind it ----------
+// ---------- title cards: the opening one is its own clip, fixed font, no app behind it ----------
+// Look (Apple keynote style by default): drifting soft colour light on near-black, a glass tag
+// pill, the title arriving word by word out of a blur, then each line on its own. Long text is
+// never dumped at once: lines come one by one, 3 per page, each staying long enough to read.
+// theme: { dark: false } for a light card, { background, accent, colors: [4 blob colours] }.
+const CARD_EXIT_MS = 800;
+const letters = s => String(s || "").replace(/[ัิ-ฺ็-๎]/g, "").replace(/\s+/g, " ").trim().length;
+
+// Timeline of a card in ms from its start (see human-yardstick: notice + characters / reading
+// speed, Thai by base letters). ms forces the reading time (stretched or squeezed to fit).
+function cardPlan({ tag = "", title = "", lines = [] }, { cps = 15, ms, max = 14000 } = {}) {
+  const read = s => (letters(s) / cps) * 1000;
+  const events = [];
+  let t = 250; // the background settles for a moment first
+  if (tag) { events.push({ at: t, kind: "tag" }); t += 300; }
+  events.push({ at: t, kind: "title" });
+  t += 900 + read(tag) / 2 + read(title); // words arriving (read as they come) + reading; a tag is glanced at
+  for (let p = 0; p * 3 < lines.length; p++) {
+    if (p) { events.push({ at: t, kind: "pageOut", page: p - 1 }); t += 450; }
+    lines.slice(p * 3, p * 3 + 3).forEach((line, i) => {
+      events.push({ at: t, kind: "line", page: p, i });
+      t += 500 + read(line);
+    });
+  }
+  t += 500; // one last look at everything
+  const need = t;
+  const total = Math.round(ms ?? Math.min(max, Math.max(2500, need)));
+  if (ms === undefined && need > max) console.warn(`card text needs ${(need / 1000).toFixed(1)} s to read - shorten it to keep the card under ${max / 1000} s`);
+  const k = total / need;
+  return { events: events.map(e => ({ ...e, at: Math.round(e.at * k) })), total, exitMs: CARD_EXIT_MS };
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+}
+
+function cardCss(font, theme = {}) {
+  const dark = theme.dark !== false;
+  const fg = dark ? "#f5f5f7" : "#1d1d1f";
+  const soft = dark ? "rgba(245,245,247,.74)" : "rgba(29,29,31,.68)";
+  const bg = theme.background || (dark ? "#0a0a0f" : "#f5f5f7");
+  const accent = theme.accent || "#0A84FF";
+  const [c1, c2, c3, c4] = theme.colors || (dark ? ["#0A84FF", "#BF5AF2", "#FF375F", "#64D2FF"] : ["#7DB8FF", "#D9A8FF", "#FFB3C1", "#9FE3F5"]);
+  // soft light from radial gradients (no blur filter: it would choke the software renderer)
+  const blob = c => `radial-gradient(circle at 50% 50%,${c} 0%,transparent 68%)`;
+  return `.demo-card{position:fixed;inset:0;overflow:hidden;display:flex;align-items:center;justify-content:center;
+    background:${bg};color:${fg};text-align:center;font-family:${font};-webkit-font-smoothing:antialiased}
+  .demo-card.mid{opacity:0;transition:opacity .5s ease}
+  .demo-card.mid.on{opacity:1}
+  .demo-card .bg{position:absolute;inset:0}
+  .demo-card .bg i{position:absolute;width:75vmax;height:75vmax;border-radius:50%;opacity:${dark ? 0.55 : 0.7};will-change:transform}
+  .demo-card .b1{left:-28vmax;top:-34vmax;background:${blob(c1)};animation:__cd1 14s ease-in-out infinite alternate}
+  .demo-card .b2{right:-30vmax;top:-22vmax;background:${blob(c2)};animation:__cd2 16s ease-in-out infinite alternate}
+  .demo-card .b3{left:-12vmax;bottom:-46vmax;background:${blob(c3)};opacity:${dark ? 0.42 : 0.6};animation:__cd3 18s ease-in-out infinite alternate}
+  .demo-card .b4{right:-24vmax;bottom:-40vmax;background:${blob(c4)};opacity:${dark ? 0.38 : 0.6};animation:__cd1 20s ease-in-out infinite alternate-reverse}
+  @keyframes __cd1{to{transform:translate(9vmax,6vmax) scale(1.12)}}
+  @keyframes __cd2{to{transform:translate(-11vmax,8vmax) scale(.92)}}
+  @keyframes __cd3{to{transform:translate(8vmax,-9vmax) scale(1.08)}}
+  .demo-card .content{position:relative;max-width:1180px;padding:0 64px;
+    transition:transform ${CARD_EXIT_MS}ms cubic-bezier(.4,0,.2,1),filter ${CARD_EXIT_MS}ms ease,opacity ${CARD_EXIT_MS}ms ease}
+  .demo-card.exit .content{transform:scale(1.06);filter:blur(16px);opacity:0}
+  .demo-card .tag{display:inline-flex;align-items:center;gap:10px;padding:9px 18px;border-radius:999px;
+    background:${dark ? "rgba(255,255,255,.1)" : "rgba(255,255,255,.7)"};border:1px solid ${dark ? "rgba(255,255,255,.16)" : "rgba(0,0,0,.08)"};
+    font-size:20px;font-weight:600;letter-spacing:.01em;color:${fg}}
+  .demo-card .tag::before{content:"";width:8px;height:8px;border-radius:50%;background:${accent}}
+  .demo-card h1{font-size:76px;font-weight:700;letter-spacing:-.03em;line-height:1.1;margin:28px 0 24px;color:${fg}}
+  .demo-card .w{display:inline-block;white-space:pre}
+  .demo-card .pages{display:grid}
+  .demo-card .page{grid-area:1/1}
+  .demo-card p{font-size:32px;font-weight:500;line-height:1.42;letter-spacing:-.01em;margin:6px 0;color:${soft}}
+  .demo-card .rv{opacity:0;transform:translateY(22px);filter:blur(12px);
+    transition:opacity .75s cubic-bezier(.16,1,.3,1),transform .75s cubic-bezier(.16,1,.3,1),filter .75s cubic-bezier(.16,1,.3,1)}
+  .demo-card .rv.in{opacity:1;transform:none;filter:none}
+  .demo-card .rv.out{opacity:0;transform:translateY(-16px);filter:blur(10px);transition-duration:.45s}`;
+}
+
+// Title split into words (Thai too: Intl.Segmenter), each arriving a beat after the last.
+function cardInner({ tag, title, lines }) {
+  let i = 0;
+  const words = [...new Intl.Segmenter("th", { granularity: "word" }).segment(String(title || ""))]
+    .map(s => (s.isWordLike ? `<span class="w rv" style="transition-delay:${Math.min(i++ * 70, 900)}ms">${esc(s.segment)}</span>` : esc(s.segment))).join("");
+  const pages = [];
+  for (let p = 0; p * 3 < lines.length; p++) {
+    pages.push(`<div class="page">${lines.slice(p * 3, p * 3 + 3).map((l, n) => `<p class="rv" data-p="${p}" data-i="${n}">${esc(l)}</p>`).join("")}</div>`);
+  }
+  return `<div class="bg"><i class="b1"></i><i class="b2"></i><i class="b3"></i><i class="b4"></i></div>` +
+    `<div class="content">${tag ? `<div class="tag rv">${esc(tag)}</div>` : ""}<h1 class="title">${words}</h1>` +
+    `<div class="pages">${pages.join("")}</div></div>`;
+}
+
+function cardHtml({ tag, title, lines, font, theme = {} }) {
+  const bodyBg = theme.solid || (theme.dark === false ? "#f5f5f7" : "#0a0a0f");
+  return `<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:${bodyBg}}${cardCss(font, theme)}</style></head>
+  <body><div id="card" class="demo-card">${cardInner({ tag, title, lines })}</div></body></html>`;
+}
+
+// Runs in the page: plays a card's timeline (cardPlan) on the element with this id.
+function playCard({ id, events, exitAt }) {
+  const card = document.getElementById(id);
+  if (!card) return;
+  const act = e => {
+    if (e.kind === "tag") card.querySelector(".tag")?.classList.add("in");
+    else if (e.kind === "title") card.querySelectorAll(".title .w").forEach(w => w.classList.add("in"));
+    else if (e.kind === "line") card.querySelector(`p[data-p="${e.page}"][data-i="${e.i}"]`)?.classList.add("in");
+    else if (e.kind === "pageOut") card.querySelectorAll(`p[data-p="${e.page}"]`).forEach(p => { p.classList.remove("in"); p.classList.add("out"); });
+  };
+  for (const e of events) setTimeout(() => act(e), e.at);
+  setTimeout(() => card.classList.add("exit"), exitAt);
+}
+
 async function recordCard({ outDir, name, tag = "", title, lines = [], ms, view = DEFAULT_VIEW, font = DEFAULT_FONT, projectDir, theme }) {
-  ms = ms ?? readMs([tag, title, ...lines]);
+  const plan = cardPlan({ tag, title, lines }, { ms });
   const { chromium } = loadPlaywright(projectDir);
   fs.mkdirSync(outDir, { recursive: true });
   const rawDir = path.join(outDir, "_raw", name);
@@ -63,10 +178,12 @@ async function recordCard({ outDir, name, tag = "", title, lines = [], ms, view 
     await page.setContent(cardHtml({ tag, title, lines, font, theme }));
     await page.evaluate(() => document.fonts.ready);
     marks.push({ t: (Date.now() - t0) / 1000, label: "start", kind: "start" });
-    await page.evaluate(() => document.getElementById("card").classList.add("on"));
-    await sleep(ms + 700);
-    await page.evaluate(() => document.getElementById("card").classList.remove("on"));
-    await sleep(800);
+    await page.evaluate(playCard, { id: "card", events: plan.events, exitAt: plan.total });
+    const played = Date.now();
+    // post.py ends the card at "end": its dissolve into the app overlaps the text blurring away,
+    // so no empty background is left in between
+    marks.push({ t: (played - t0 + plan.total + plan.exitMs + 100) / 1000, label: "end", kind: "end" });
+    await sleep(plan.total + plan.exitMs + 500);
     const video = page.video();
     await context.close();
     const dest = path.join(outDir, `${name}.webm`);
@@ -76,62 +193,112 @@ async function recordCard({ outDir, name, tag = "", title, lines = [], ms, view 
   } finally { await browser.close().catch(() => {}); }
 }
 
-function esc(s) {
-  return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+// The accent as CSS values: the colour, its "r,g,b" for glows, and black or white text on it.
+function accentVars(hex) {
+  const n = parseInt(String(hex).replace("#", "").replace(/^(.)(.)(.)$/, "$1$1$2$2$3$3"), 16);
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  const lin = c => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+  const lum = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+  return { a: `rgb(${r},${g},${b})`, rgb: `${r},${g},${b}`, on: lum > 0.36 ? "#111" : "#fff" };
 }
 
-function cardCss(font, theme = {}) {
-  const bg = theme.background || "linear-gradient(135deg,#1e1b4b 0%,#312e81 45%,#7c2d12 100%)";
-  const accent = theme.accent || "#fdba74";
-  return `.demo-card{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
-    background:${bg};color:#fff;text-align:center;font-family:${font};opacity:0;transition:opacity .6s}
-  .demo-card.on{opacity:1}
-  .demo-card .tag{font-family:${font};font-weight:700;font-size:22px;letter-spacing:.2em;color:${accent};margin-bottom:22px}
-  .demo-card h1{font-family:${font};font-size:64px;font-weight:800;margin:0 0 18px}
-  .demo-card p{font-family:${font};font-size:30px;margin:6px 0;max-width:1100px;color:#e0e7ff}`;
-}
-
-function cardInner({ tag, title, lines }) {
-  return `<div class="tag">${esc(tag)}</div><h1>${esc(title)}</h1>` + lines.map(l => `<p>${esc(l)}</p>`).join("");
-}
-
-function cardHtml({ tag, title, lines, font, theme }) {
-  const bodyBg = (theme && theme.solid) || "#1e1b4b";
-  return `<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:${bodyBg}}${cardCss(font, theme)}</style></head>
-  <body><div id="card" class="demo-card">${cardInner({ tag, title, lines })}</div></body></html>`;
+// Runs in the page: the first of `palette` whose hue is far from the app's own saturated colours
+// (backgrounds weighted by area, text and borders a little), so highlights stand out.
+function pickAccentInPage(palette) {
+  const hue = ([r, g, b]) => {
+    r /= 255; g /= 255; b /= 255;
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn, l = (mx + mn) / 2;
+    const s = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
+    let h = 0;
+    if (d) h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    return { h: (h * 60 + 360) % 360, s, l };
+  };
+  const rgba = c => { const m = /rgba?\(([^)]+)\)/.exec(c); if (!m) return null; const v = m[1].split(/[\s,/]+/).filter(Boolean).map(Number); return v.length >= 3 ? [v[0], v[1], v[2], v[3] ?? 1] : null; };
+  const hexRgb = h => { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+  const W = innerWidth, H = innerHeight;
+  const seen = [];
+  let total = 0, n = 0;
+  const add = (c, w) => {
+    const v = rgba(c);
+    if (!v || v[3] < 0.4 || w <= 0) return;
+    const { h, s, l } = hue(v);
+    if (s < 0.3 || l < 0.15 || l > 0.9) return; // greys, near-black and near-white do not clash
+    seen.push([h, w]); total += w;
+  };
+  for (const el of document.querySelectorAll("body *")) {
+    if (++n > 4000) break;
+    if (el.closest("#__demo_root,#__demo_redact")) continue;
+    const r = el.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2 || r.bottom < 0 || r.top > H || r.right < 0 || r.left > W) continue;
+    const cs = getComputedStyle(el);
+    if (cs.visibility === "hidden" || Number(cs.opacity) < 0.3) continue;
+    add(cs.backgroundColor, Math.sqrt(Math.min(r.width, W) * Math.min(r.height, H)));
+    if ([...el.childNodes].some(t => t.nodeType === 3 && t.nodeValue.trim())) add(cs.color, 8);
+    if (parseFloat(cs.borderTopWidth) > 0) add(cs.borderTopColor, 4);
+  }
+  const clash = hex => {
+    const h = hue(hexRgb(hex)).h;
+    return seen.reduce((sum, [x, w]) => { const d = Math.min(Math.abs(x - h), 360 - Math.abs(x - h)); return sum + (d < 40 ? w : 0); }, 0);
+  };
+  const fine = palette.find(c => clash(c) <= 0.08 * total);
+  return fine || palette.reduce((best, c) => (clash(c) < clash(best) ? c : best));
 }
 
 // ---------- overlay installed into every app document ----------
+// Look: Apple style by default. Glass caption, a ring in the session's accent colour (see
+// pickAccentInPage), label pills in that colour, a macOS black-and-white arrow.
 function overlayInit(font) {
   const install = () => {
-    if (document.getElementById("__demo_root")) return;
+    const v = window.__demoAccent || { a: "rgb(0,122,255)", rgb: "0,122,255", on: "#fff" };
+    const old = document.getElementById("__demo_root");
+    if (old) { if (old.dataset.accent !== v.a) { old.style.setProperty("--a", v.a); old.style.setProperty("--a-rgb", v.rgb); old.style.setProperty("--on-a", v.on); old.dataset.accent = v.a; } return; }
     const root = document.createElement("div");
     root.id = "__demo_root";
-    root.style.cssText = "position:fixed;inset:0;pointer-events:none;z-index:2147483647;";
+    root.style.cssText = `position:fixed;inset:0;pointer-events:none;z-index:2147483647;--a:${v.a};--a-rgb:${v.rgb};--on-a:${v.on}`;
+    root.dataset.accent = v.a;
     const style = document.createElement("style");
     style.textContent = `
-      #__demo_root, #__demo_root *{font-family:${font} !important}
-      #__demo_cursor{position:fixed;width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%;
-        background:rgba(255,120,0,.35);border:3px solid #ff7a00;box-shadow:0 0 0 2px #fff;
-        transition:transform .12s;left:-100px;top:-100px}
-      #__demo_cursor.down{transform:scale(.6);background:rgba(255,120,0,.75)}
-      .__demo_ripple{position:fixed;width:20px;height:20px;margin:-10px 0 0 -10px;border-radius:50%;
-        border:3px solid #ff7a00;animation:__rip .6s ease-out forwards}
-      @keyframes __rip{to{transform:scale(4);opacity:0}}
-      #__demo_caption{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;max-width:86%;
-        background:rgba(17,24,39,.88);color:#fff;font-weight:600;font-size:24px;line-height:1.35;
-        padding:10px 22px;border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,.3);text-align:center;
-        border-left:6px solid #ff7a00;opacity:0;transition:opacity .3s}
+      #__demo_root, #__demo_root *{font-family:${font} !important;-webkit-font-smoothing:antialiased}
+      #__demo_cursor{position:fixed;width:22px;height:28px;left:-100px;top:-100px;transform-origin:0 0;
+        filter:drop-shadow(0 2px 3px rgba(0,0,0,.35));transition:transform .12s,opacity .3s}
+      #__demo_cursor svg{display:block;width:100%;height:100%;overflow:visible}
+      #__demo_cursor.down{transform:scale(.85)}
+      #__demo_cursor.rest{opacity:.25}
+      #__demo_cursor.away{opacity:0}
+      .__demo_ripple{position:fixed;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;
+        background:rgba(var(--a-rgb),.22);border:2px solid var(--a);animation:__rip .55s cubic-bezier(.2,.8,.2,1) forwards}
+      @keyframes __rip{to{transform:scale(3.2);opacity:0}}
+      #__demo_caption{position:fixed;left:50%;transform:translateX(-50%);bottom:28px;max-width:min(86%,1120px);
+        background:rgba(28,28,30,.78);-webkit-backdrop-filter:blur(24px) saturate(180%);backdrop-filter:blur(24px) saturate(180%);
+        color:#f5f5f7;font-weight:600;font-size:26px;line-height:1.35;letter-spacing:-.01em;
+        padding:12px 26px;border-radius:20px;border:1px solid rgba(255,255,255,.14);
+        box-shadow:0 12px 40px rgba(0,0,0,.28);text-align:center;opacity:0;transition:opacity .35s ease}
       #__demo_caption.top{bottom:auto;top:84px}
-      .__demo_hl{position:fixed;border:4px solid #ff7a00;border-radius:10px;
-        box-shadow:0 0 0 9999px rgba(0,0,0,.28),0 0 18px 4px rgba(255,122,0,.8);animation:__pulse 1s ease-in-out infinite alternate}
-      @keyframes __pulse{from{box-shadow:0 0 0 9999px rgba(0,0,0,.28),0 0 8px 2px rgba(255,122,0,.6)}to{box-shadow:0 0 0 9999px rgba(0,0,0,.28),0 0 26px 8px rgba(255,122,0,.95)}}
-      .__demo_hl_label{position:fixed;background:#ff7a00;color:#fff;font-weight:700;font-size:20px;line-height:1.3;
-        padding:6px 14px;border-radius:8px;white-space:nowrap;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+      .__demo_hl{position:fixed;border:3px solid var(--a);border-radius:14px;
+        box-shadow:0 0 0 9999px rgba(0,0,0,.22),0 0 0 5px rgba(var(--a-rgb),.2),0 10px 30px rgba(var(--a-rgb),.4);
+        animation:__hlin .35s cubic-bezier(.2,.8,.2,1),__breathe 1.4s .35s ease-in-out infinite alternate}
+      @keyframes __hlin{from{opacity:0;transform:scale(1.04)}}
+      @keyframes __breathe{to{box-shadow:0 0 0 9999px rgba(0,0,0,.22),0 0 0 9px rgba(var(--a-rgb),.26),0 12px 40px rgba(var(--a-rgb),.55)}}
+      .__demo_hl_label{position:fixed;background:var(--a);color:var(--on-a);font-weight:600;font-size:20px;line-height:1.3;
+        letter-spacing:-.005em;padding:7px 16px;border-radius:12px;white-space:nowrap;
+        box-shadow:0 8px 24px rgba(0,0,0,.22),inset 0 0 0 1px rgba(255,255,255,.16);animation:__lblin .35s cubic-bezier(.2,.8,.2,1)}
+      @keyframes __lblin{from{opacity:0;transform:translateY(6px)}}
     `;
     root.appendChild(style);
+    // An arrow whose tip is the pointer, like a real one: what is pointed at stays readable,
+    // where a ring centred on it hid it. Built node by node: some apps forbid innerHTML.
     const cur = document.createElement("div");
     cur.id = "__demo_cursor";
+    const NS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("viewBox", "0 0 22 28");
+    const arrow = document.createElementNS(NS, "path");
+    arrow.setAttribute("d", "M0 0V21L5.5 15.8L9.3 24.6L13.2 23L9.5 14.4H16.5Z");
+    for (const [k, val] of [["fill", "#111"], ["stroke", "#fff"], ["stroke-width", "1.7"], ["stroke-linejoin", "round"]]) arrow.setAttribute(k, val);
+    svg.appendChild(arrow);
+    cur.appendChild(svg);
+    let state = null; try { state = sessionStorage.getItem("__demo_cursor_state"); } catch {}
+    if (state === "rest" || state === "away") cur.classList.add(state);
     root.appendChild(cur);
     const cap = document.createElement("div");
     cap.id = "__demo_caption";
@@ -144,13 +311,27 @@ function overlayInit(font) {
   };
   document.addEventListener("DOMContentLoaded", install);
   setInterval(install, 500); // SPAs can replace <body>
+  // A cursor left standing on what was just clicked or typed hides the result: it fades
+  // ("rest") once the click is done and comes back on the next move. A highlight hides it
+  // ("away") where it would sit on the frame. Kept in sessionStorage, so the page a click
+  // opens does not show it at full strength over its content.
+  let restTimer = 0, resting = false;
+  const show = c => {
+    clearTimeout(restTimer);
+    if (!resting && !(c && (c.classList.contains("rest") || c.classList.contains("away")))) return;
+    resting = false;
+    if (c) c.classList.remove("rest", "away");
+    try { sessionStorage.removeItem("__demo_cursor_state"); } catch {}
+  };
   window.addEventListener("mousemove", e => {
     const c = document.getElementById("__demo_cursor");
     if (c) { c.style.left = e.clientX + "px"; c.style.top = e.clientY + "px"; }
+    show(c);
     try { sessionStorage.setItem("__demo_mouse", JSON.stringify([e.clientX, e.clientY])); } catch {}
   }, true);
   window.addEventListener("mousedown", e => {
     const c = document.getElementById("__demo_cursor");
+    show(c);
     if (c) c.classList.add("down");
     const root = document.getElementById("__demo_root");
     if (!root) return;
@@ -162,6 +343,10 @@ function overlayInit(font) {
   window.addEventListener("mouseup", () => {
     const c = document.getElementById("__demo_cursor");
     if (c) c.classList.remove("down");
+    clearTimeout(restTimer);
+    resting = true;
+    try { sessionStorage.setItem("__demo_cursor_state", "rest"); } catch {} // now: the click may navigate
+    restTimer = setTimeout(() => { const n = document.getElementById("__demo_cursor"); if (n) n.classList.add("rest"); }, 300);
   }, true);
 }
 
@@ -234,6 +419,7 @@ async function startSession(opts) {
     const marks = [];
     const shots = [];
     const demo = makeDemo(page, marks, t0, { view, font, theme: opts.theme, shots, shotDir: path.join(outDir, "shots", name) });
+    let accent;
 
     await guard(async () => {
       if (startUrl) {
@@ -244,6 +430,7 @@ async function startSession(opts) {
       }
       await page.evaluate(() => document.fonts.ready).catch(() => {});
       if (opts.beforeStart) await opts.beforeStart(page); // e.g. load a terminal replay; trimmed off with the page load
+      accent = await useAccent(context, page, opts.theme);
     });
     demo.mark("start", "start"); // post.py trims everything before this
 
@@ -262,7 +449,7 @@ async function startSession(opts) {
       await browser.close();
       return dest;
     }
-    return { browser, context, page, demo, finish, shots };
+    return { browser, context, page, demo, finish, shots, accent };
   } catch (error) {
     await browser.close().catch(() => {});
     throw error;
@@ -289,6 +476,7 @@ async function startElectron(pw, opts, view, font) {
   const shots = [];
   const demo = makeDemo(page, marks, t0, { view, font, theme: opts.theme, shots, shotDir: path.join(outDir, "shots", name) });
   await page.evaluate(() => document.fonts.ready).catch(() => {});
+  const accent = await useAccent(app.context(), page, opts.theme);
   demo.mark("start", "start");
   async function finish() {
     await sleep(1200);
@@ -299,7 +487,21 @@ async function startElectron(pw, opts, view, font) {
     fs.writeFileSync(path.join(outDir, `${name}.marks.json`), JSON.stringify(marks, null, 2));
     return dest;
   }
-  return { app, context: app.context(), page, demo, finish, shots };
+  return { app, context: app.context(), page, demo, finish, shots, accent };
+}
+
+// One accent for the whole video: theme.accent, else picked from the start page's colours.
+// New documents get it from an init script; the page already open gets it directly.
+async function useAccent(context, page, theme) {
+  const accent = (theme && theme.accent) || await page.evaluate(pickAccentInPage, ACCENTS).catch(() => ACCENTS[0]);
+  const vars = accentVars(accent);
+  await context.addInitScript(v => { window.__demoAccent = v; }, vars);
+  await page.evaluate(v => {
+    window.__demoAccent = v;
+    const r = document.getElementById("__demo_root");
+    if (r) { r.style.setProperty("--a", v.a); r.style.setProperty("--a-rgb", v.rgb); r.style.setProperty("--on-a", v.on); r.dataset.accent = v.a; }
+  }, vars).catch(() => {});
+  return accent;
 }
 
 // Runs in the page. What a person sees at (x, y) (default: el's centre) over el: null when
@@ -449,11 +651,12 @@ function makeDemo(page, marks, t0, { view, font, theme, shots, shotDir }) {
       // an image overlay) is part of what the user clicks; one that is already there is not.
       const hoverOk = pointerIn(b) || !(await aimAt(locator)).blocked;
       await moveTo(b.x + b.width / 2, b.y + b.height / 2);
-      if (highlight) await highlightLocator(locator, highlight, slow ? 2200 : 1400, {}, hoverOk);
+      if (highlight) await highlightLocator(locator, highlight, slow ? 2200 : 1400, { keepCursor: true }, hoverOk);
       await sleep(pauseBefore ?? (slow ? 1200 : 400));
       const aim = await waitUncovered(locator, "the click target", hoverOk);
       if (aim.blocked) throw new Error(`click target is covered by ${aim.blocked} at (${Math.round(aim.x)},${Math.round(aim.y)}); close or scroll away what covers it`);
       if (Math.hypot(aim.x - mouse.x, aim.y - mouse.y) > 3) await moveTo(aim.x, aim.y);
+      marks.push({ t: now(), label: "click", kind: "click" }); // post.py puts a click sound here
       await page.mouse.down();
       await sleep(90);
       await page.mouse.up();
@@ -592,7 +795,8 @@ function makeDemo(page, marks, t0, { view, font, theme, shots, shotDir }) {
       if (found?.covered) throw new Error(`highlightText "${what}": the text is behind ${found.covered}; close the modal/popup first or highlight text inside it`);
       const b = found?.box;
       if (!b) throw new Error(`highlightText: "${what}" is not on screen as text. A canvas/WebGL terminal draws no DOM text — use xterm.js's DOM renderer (see references/surfaces.md), or highlight a known box with demo.highlightBox().`);
-      await moveTo(b.x + b.width / 2, b.y + b.height / 2);
+      // point at where the text ends: the eye follows the pointer, and the text stays readable
+      await moveTo(b.x + Math.max(b.width - 3, b.width / 2), b.y + b.height / 2);
       return demo.highlightBox(b, label, ms, { shot });
     },
 
@@ -606,13 +810,15 @@ function makeDemo(page, marks, t0, { view, font, theme, shots, shotDir }) {
 
     // Highlight a box in page pixels ({ x, y, width, height }). Refuses a box covering most of the
     // screen: an orange frame round everything (a whole terminal, a whole page) points at nothing.
-    async highlightBox(b, label, ms = 2200, { shot, whole = false } = {}) {
+    // A cursor standing on the frame or its label is hidden until it moves again; click's own
+    // pre-click highlight passes keepCursor, since there the pointer shows what gets pressed.
+    async highlightBox(b, label, ms = 2200, { shot, whole = false, keepCursor = false } = {}) {
       if (!whole && b.width * b.height > 0.5 * view.width * view.height) {
         throw new Error(`highlight "${label || ""}" would cover ${Math.round((100 * b.width * b.height) / (view.width * view.height))}% of the screen. ` +
           "Highlight the part that matters: demo.highlightText(text, label) inside terminals/logs/long text, a smaller locator, or pass { whole: true } if the whole screen really is the point.");
       }
       marks.push({ t: now(), end: now() + ms / 1000, label: "highlight: " + (label || ""), kind: "highlight" });
-      await page.evaluate(({ b, label, ms }) => {
+      await page.evaluate(({ b, label, ms, keepCursor }) => {
         const root = document.getElementById("__demo_root");
         if (!root) return;
         const pad = 8;
@@ -684,12 +890,21 @@ function makeDemo(page, marks, t0, { view, font, theme, shots, shotDir }) {
             obstacles.reduce((s, o, i) => s + area(c, o) * (i === 0 ? 10 : 1), 0))[0];
           Object.assign(lab.style, { left: best.x + "px", top: best.y + "px" });
         }
+        const cur = document.getElementById("__demo_cursor");
+        if (!keepCursor && cur && !cur.classList.contains("away")) {
+          const cr = rectOf(cur);
+          if (hit(cr, target, 2) || (lab && hit(cr, rectOf(lab), 2))) {
+            cur.classList.remove("rest");
+            cur.classList.add("away");
+            try { sessionStorage.setItem("__demo_cursor_state", "away"); } catch {}
+          }
+        }
         setTimeout(() => {
           hl.remove();
           lab && lab.remove();
           if (movedCaption !== null && cap) cap.classList.toggle("top", movedCaption);
         }, ms);
-      }, { b, label, ms });
+      }, { b, label, ms, keepCursor });
       if (shot) {
         const t = Date.now();
         await sleep(400);
@@ -715,32 +930,33 @@ function makeDemo(page, marks, t0, { view, font, theme, shots, shotDir }) {
       await sleep(300);
     },
 
-    // Mid-video title card over the app (same fixed font as the opening card).
+    // Mid-video title card over the app: same look and pacing as the opening card.
     async card({ tag = "", title, lines = [] }, ms) {
-      ms = ms ?? readMs([tag, title, ...lines]);
-      marks.push({ t: now(), end: now() + (ms + 1400) / 1000, label: "card: " + title, kind: "card" });
+      const plan = cardPlan({ tag, title, lines }, { ms });
+      marks.push({ t: now(), end: now() + (plan.total + plan.exitMs + 1100) / 1000, label: "card: " + title, kind: "card" });
       await page.evaluate(({ html, css }) => {
         const root = document.getElementById("__demo_root");
         if (!root) return;
         const s = document.createElement("style");
         s.textContent = css;
         const card = document.createElement("div");
-        card.className = "demo-card";
+        card.className = "demo-card mid";
         card.id = "__demo_card";
         card.innerHTML = html;
         root.appendChild(s);
         root.appendChild(card);
         requestAnimationFrame(() => card.classList.add("on"));
       }, { html: cardInner({ tag, title, lines }), css: cardCss(font, theme) });
-      await sleep(ms + 600);
+      await page.evaluate(playCard, { id: "__demo_card", events: plan.events, exitAt: plan.total });
+      await sleep(plan.total + plan.exitMs);
       await page.evaluate(() => {
         const c = document.getElementById("__demo_card");
-        if (c) { c.classList.remove("on"); setTimeout(() => c.remove(), 700); }
+        if (c) { c.classList.remove("on"); setTimeout(() => c.remove(), 600); }
       });
-      await sleep(800);
+      await sleep(600);
     },
   };
   return demo;
 }
 
-module.exports = { startSession, recordCard, sleep, readMs, DEFAULT_FONT, DEFAULT_VIEW };
+module.exports = { startSession, recordCard, sleep, readMs, cardPlan, accentVars, DEFAULT_FONT, DEFAULT_VIEW, ACCENTS };

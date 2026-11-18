@@ -52,6 +52,14 @@ other edge while a highlight sits under it. Keep labels short (≤ ~40 character
 spot exists; when two things matter at once, highlight both in one `Promise.all` rather than
 stacking text. The review (§6) checks for overlaps too.
 
+The cursor follows the same rule. It is an arrow whose tip is the click point, so the label
+it points at stays readable. Once a click is done it fades to a faint trace, so the result
+appears where the pointer just was, and it comes back on the next move. A highlight hides
+the cursor when it would sit on the frame or label. The exception is `click(…, { highlight })`,
+where the pointer shows what is about to be pressed. `highlightText` points at the end of
+the text, not its middle. To show a hover effect, use `demo.hover(locator)`, which keeps the
+cursor at full strength.
+
 Pacing — what makes the video short but still convincing:
 
 - Wrap **every wait for the app** in `demo.waitApp(...)` (page loads, spinners, polling,
@@ -67,11 +75,26 @@ Pacing — what makes the video short but still convincing:
   fill the slot").
 - Aim for 1–2 minutes per case after post-processing.
 
-All overlay text (cards, captions, labels) uses one fixed font, `opts.font` (default
-`'Leelawadee UI','Noto Sans Thai','Sarabun',…`), so every case looks the same regardless of
-which web font the app has loaded. Pass `font` to both `recordCard` and `startSession` to
-change it. Do not inject cards into the app page before it has loaded — that is what made
-the font jump between cases.
+All overlay text (cards, captions, labels) uses one fixed font, `opts.font`. The default is
+Apple's system font where it exists: `-apple-system, 'SF Pro Display', …, 'Segoe UI Variable
+Display', 'Segoe UI', 'Inter'`, then `'Leelawadee UI', 'Noto Sans Thai', 'Sarabun'` for Thai.
+So every case looks the same, whatever web font the app has loaded. Pass `font` to both
+`recordCard` and `startSession` to change it. Do not inject cards into the app page before
+it has loaded; that is what made the font jump between cases.
+
+The look is Apple style by default, and the user may ask for anything else. `theme` (passed
+to `recordCard` and `startSession`, or set in the case) holds:
+- `accent`: the ring and label colour. Without it, the kit reads the start page's colours and
+  picks the first of Apple blue, purple, pink, indigo, green, orange or teal whose hue is far
+  from them. `session.accent` says which one it picked.
+- `dark: false`: a light intro (`#f5f5f7` with pastel light).
+- `background`: replaces the intro's background.
+- `colors`: the intro's 4 light colours.
+
+Cards pace themselves (`cardPlan`). The title arrives word by word, and each line follows
+once the previous one could be read. With more than 3 lines they come 3 per page, and a
+card is capped at 14 s with a warning to shorten it. Keep cards short anyway: one claim, at
+most 3 lines.
 
 ### Screenshots from the same run
 
@@ -97,7 +120,8 @@ python scripts/post.py concat "<root>/<combined>/all.mp4" intro.mp4 01.mp4 02.mp
 
 `one` trims before the first step, squeezes `waitApp` spans and any picture that stays
 still for 2.5 s+ (cards, highlights and the first 2.5 s of each caption are protected),
-prepends the title card, and lays a music bed (seed = a different tune per case). It
+prepends the title card, which dissolves into the app over 0.7 s. It adds a music bed
+(`--music-style cozy|calm`; the seed gives a different tune per case). It
 prints recorded vs final length — if a case is still long, find the unwrapped waits.
 `concat` joins finished clips and re-lays one continuous music bed. An intro card for the
 combined video is `recordCard` + `post.py card <card.webm> intro.mp4`.
@@ -122,7 +146,11 @@ Pictures are the expensive part (a full 1440×900 frame is ~1.7k tokens to look 
 ## Many cases: one subagent per case
 
 Use one thread by default. Only substantial independent cases benefit from parallel
-recording; keep 2–3 workers and give each a narrow brief. Fill `references/agent-brief.md` once (shared
+workers; keep 2–3 and give each a narrow brief. Workers write and storyboard their cases in
+parallel, but **takes on one machine run one at a time**. `run-case.cjs` queues them by itself
+and prints `QUEUE` while one waits. Parallel takes against one app and database deadlocked
+on 2026-11-18 and waited silently. Editing does not touch the app, so it overlaps the next take.
+Fill `references/agent-brief.md` once (shared
 rules + kit API) and give each agent only its case: data setup, story, card text, file
 name, music seed, unique identifiers.
 

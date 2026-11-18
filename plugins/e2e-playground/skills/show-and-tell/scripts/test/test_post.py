@@ -158,6 +158,34 @@ class FinishCliTests(unittest.TestCase):
             self.assertTrue(json.loads(again.stdout)["cached"])
             self.assertEqual(out.stat().st_mtime_ns, modified)
 
+    def test_title_card_dissolves_into_the_case_instead_of_cutting(self):
+        with tempfile.TemporaryDirectory(prefix="demo xfade ") as folder:
+            root = Path(folder)
+            clips = {}
+            for name, colour in (("card", "red"), ("case", "blue")):
+                clips[name] = root / f"{name}.webm"
+                subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+                    "-f", "lavfi", "-i", f"color=c={colour}:size=320x240:rate=30:duration=2",
+                    "-c:v", "libvpx-vp9", "-threads", "1", str(clips[name])], check=True)
+            # the card ends at its "end" mark (1.8 s), not at the end of its 2 s clip
+            clips["card"].with_suffix(".marks.json").write_text(
+                '[{"t": 0, "label": "start", "kind": "start"}, {"t": 1.8, "label": "end", "kind": "end"}]', encoding="utf-8")
+            out = root / "out.mp4"
+            subprocess.run([sys.executable, str(SCRIPT), "one", str(clips["case"]), str(out),
+                            "--card", str(clips["card"]), "--no-music"], check=True, capture_output=True)
+            self.assertAlmostEqual(post.duration(str(out)), 3.8 - post.CARD_XFADE, delta=0.15)
+
+            def pixel(t):
+                raw = subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-ss", f"{t}", "-i", str(out),
+                                      "-frames:v", "1", "-vf", "crop=1:1:160:120", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+                                     check=True, capture_output=True).stdout
+                return tuple(raw[:3])
+
+            red, mid, blue = pixel(0.5), pixel(1.8 - post.CARD_XFADE / 2), pixel(2.9)
+            self.assertGreater(red[0], 200)
+            self.assertGreater(blue[2], 200)
+            self.assertTrue(60 < mid[0] < 200 and 60 < mid[2] < 200, f"half-way through the dissolve: {mid}")
+
 
 if __name__ == "__main__":
     unittest.main()
