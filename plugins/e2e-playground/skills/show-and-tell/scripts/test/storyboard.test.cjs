@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const os = require("node:os");
-const { storyboard } = require("../storyboard.cjs");
+const { storyboard, clock } = require("../storyboard.cjs");
 const { runCase } = require("../run-case.cjs");
 
 function tmp(t) {
@@ -93,4 +93,44 @@ test("recording numbers steps against a storyboard of the same case only", async
   log = fs.readFileSync(path.join(root, "final.progress.log"), "utf8");
   assert.match(log, / STEP 1 one\n/, "a stale storyboard must not claim a total");
   assert.equal(events.length, 4);
+});
+
+test("yes/no checks on the live page answer 'not on screen', so their branch is not shown", async t => {
+  const root = tmp(t);
+  const config = {
+    ...forkliftCase(root),
+    async run({ page, demo }) {
+      await demo.caption("Open the queue");
+      if (await page.getByRole("dialog").isVisible()) { await demo.caption("Close popup"); await demo.click(page.getByRole("button", { name: "Close" })); }
+      if (await page.locator(".spinner").isHidden()) await demo.caption("List loaded");
+    },
+  };
+  const result = await storyboard(config, { write: false });
+  assert.equal(result.steps, 2, "isVisible() false skips the popup scene; isHidden() true keeps 'List loaded'");
+  assert.ok(!result.markdown.includes("Close popup"));
+  assert.match(result.markdown, /2 live check\(s\) such as isVisible\(\) were answered "not on screen"/);
+});
+
+test("a run() that awaits real timers in a loop stops on the time limit", async t => {
+  const root = tmp(t);
+  let polling = true;
+  t.after(() => { polling = false; }); // let the abandoned loop end so the test process can exit
+  const config = {
+    ...forkliftCase(root),
+    async run({ demo }) {
+      await demo.caption("Poll the API");
+      while (polling) await new Promise(r => setTimeout(r, 50));
+    },
+  };
+  const started = Date.now();
+  const result = await storyboard(config, { write: false, timeLimitMs: 300 });
+  assert.ok(Date.now() - started < 2000);
+  assert.match(result.stopped, /stopped after 0 s|stopped after \d+ s/);
+  assert.equal(result.steps, 1);
+});
+
+test("length never prints 60 seconds", () => {
+  assert.equal(clock(59.6), "1:00");
+  assert.equal(clock(119.5), "2:00");
+  assert.equal(clock(61.2), "1:01");
 });

@@ -25,27 +25,54 @@ export async function launch({ appPackageJson, time, timezoneId = "UTC", locale 
 }
 
 // What a reader would see at the element's centre: null when it is the element (or its
-// child/parent), else "tag#id.class" of what covers it — an open modal, its backdrop, a toast.
-// Our own marks and redaction bars are pointer-events:none, so they are looked through.
+// child/parent, light or shadow DOM), else "tag#id.class" of what covers it — an open modal,
+// its backdrop, a toast. Our own marks and redaction bars are pointer-events:none, so they are
+// looked through; a pointer-events:none target (a floating label) is made hittable for the probe.
+// Same check as show-and-tell's demo-kit coverInPage (each skill ships standalone).
+function coverAtCentre(el) {
+  const doc = el.ownerDocument;
+  const parentOf = (n) => n.assignedSlot || (n.parentNode && n.parentNode.nodeType === 11 && n.parentNode.host) || n.parentNode;
+  const within = (outer, inner) => { for (let n = inner; n; n = parentOf(n)) if (n === outer) return true; return false; };
+  const r = el.getBoundingClientRect();
+  const x = r.left + r.width / 2, y = r.top + r.height / 2;
+  const pick = () => {
+    let hit = doc.elementFromPoint(x, y);
+    while (hit && hit.shadowRoot) { // look inside open shadow roots (web components)
+      const inner = hit.shadowRoot.elementFromPoint(x, y);
+      if (!inner || inner === hit) break;
+      hit = inner;
+    }
+    return hit;
+  };
+  let hit;
+  if (getComputedStyle(el).pointerEvents === "none") {
+    const style = el.getAttribute("style");
+    el.style.setProperty("pointer-events", "auto", "important");
+    try { hit = pick(); } finally {
+      el.getAttribute("style"); // Chrome writes the attribute lazily: sync it now, or it comes back as style=""
+      if (style === null) el.removeAttribute("style"); else el.setAttribute("style", style);
+    }
+  } else hit = pick();
+  if (!hit || within(el, hit) || within(hit, el)) return null;
+  const label = hit.closest && hit.closest("label");
+  if (label && label.control === el) return null;
+  const cls = typeof hit.className === "string" ? hit.className.trim().split(/\s+/).filter(Boolean).slice(0, 2) : [];
+  return hit.tagName.toLowerCase() + (hit.id ? "#" + hit.id : "") + cls.map((c) => "." + c).join("");
+}
+
 export async function coveredBy(locator) {
-  return locator.evaluate((el) => {
-    const r = el.getBoundingClientRect();
-    const hit = el.ownerDocument.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-    if (!hit || hit === el || el.contains(hit) || hit.contains(el)) return null;
-    const label = hit.closest && hit.closest("label");
-    if (label && label.control === el) return null;
-    const cls = typeof hit.className === "string" ? hit.className.trim().split(/\s+/).filter(Boolean).slice(0, 2) : [];
-    return hit.tagName.toLowerCase() + (hit.id ? "#" + hit.id : "") + cls.map((c) => "." + c).join("");
-  });
+  return locator.evaluate(coverAtCentre);
 }
 
 // marks: [{ el: Locator, n?: number, box?: boolean (default true), pos?: "corner" | "left" }]
 // Refuses an element hidden behind a modal/backdrop/toast: a badge on something the reader
 // cannot see sends them to the wrong place. Close the modal first, or mark what is inside it.
 export async function annotate(page, marks) {
+  // Scroll every target first, then measure and check each one: scrolling to a later mark can
+  // move an earlier one or put something on top of it.
+  for (const m of marks) await m.el.scrollIntoViewIfNeeded();
   const rects = [];
   for (const m of marks) {
-    await m.el.scrollIntoViewIfNeeded();
     const b = await m.el.boundingBox();
     if (!b) throw new Error(`annotate: element for badge ${m.n ?? "-"} is not visible`);
     const cover = await coveredBy(m.el);

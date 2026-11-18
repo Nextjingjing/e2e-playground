@@ -302,6 +302,63 @@ async function startElectron(pw, opts, view, font) {
   return { app, context: app.context(), page, demo, finish, shots };
 }
 
+// Runs in the page. What a person sees at (x, y) (default: el's centre) over el: null when
+// it is el itself or its child/parent, light or shadow DOM, else "tag#id.class" of the cover
+// (tag/id/class only: its text may hold names or other personal data). Kit overlays and
+// redaction bars are pointer-events:none, so they are looked through. A pointer-events:none
+// target (a floating label) is made hittable for this one probe. hoverOk accepts a part of
+// the same widget that hovering it revealed (row action bar, image overlay): it shares a
+// hovered ancestor below <body> with el, and nothing between is fixed or sticky (a modal,
+// backdrop, toast or sticky header never qualifies). allow: CSS selector of a widget whose
+// own layers never count as covers (".xterm").
+function coverInPage(el, { x, y, hoverOk = false, allow = null } = {}) {
+  const doc = el.ownerDocument;
+  const parentOf = n => n.assignedSlot || (n.parentNode && n.parentNode.nodeType === 11 && n.parentNode.host) || n.parentNode;
+  const within = (outer, inner) => { for (let n = inner; n; n = parentOf(n)) if (n === outer) return true; return false; };
+  if (x === undefined || y === undefined) {
+    const r = el.getBoundingClientRect();
+    x = r.left + r.width / 2;
+    y = r.top + r.height / 2;
+  }
+  const pick = () => {
+    let hit = doc.elementFromPoint(x, y);
+    while (hit && hit.shadowRoot) { // look inside open shadow roots (web components)
+      const inner = hit.shadowRoot.elementFromPoint(x, y);
+      if (!inner || inner === hit) break;
+      hit = inner;
+    }
+    return hit;
+  };
+  let hit;
+  if (el.nodeType === 1 && getComputedStyle(el).pointerEvents === "none") {
+    const style = el.getAttribute("style");
+    el.style.setProperty("pointer-events", "auto", "important");
+    try { hit = pick(); } finally {
+      el.getAttribute("style"); // Chrome writes the attribute lazily: sync it now, or it comes back as style=""
+      if (style === null) el.removeAttribute("style"); else el.setAttribute("style", style);
+    }
+  } else hit = pick();
+  if (!hit || within(el, hit) || within(hit, el)) return null;
+  const label = hit.closest && hit.closest("label");
+  if (label && label.control === el) return null;
+  const widget = allow && el.closest && el.closest(allow);
+  if (widget && within(widget, hit)) return null;
+  if (hoverOk) {
+    let common = parentOf(el);
+    while (common && !within(common, hit)) common = parentOf(common);
+    if (common && common.nodeType === 1 && common !== doc.body && common !== doc.documentElement && common.matches(":hover")) {
+      let pinned = false;
+      for (let n = hit; n && n !== common; n = parentOf(n))
+        if (n.nodeType === 1 && /^(fixed|sticky)$/.test(getComputedStyle(n).position)) pinned = true;
+      if (!pinned) return null;
+    }
+  }
+  const cls = typeof hit.className === "string" ? hit.className.trim().split(/\s+/).filter(Boolean).slice(0, 2) : [];
+  return hit.tagName.toLowerCase() + (hit.id ? "#" + hit.id : "") + cls.map(c => "." + c).join("");
+}
+// Installed on demand as a string: DevTools evaluation is not blocked by the app's CSP.
+const COVER_SCRIPT = `void (window.__demoCoverAt || Object.defineProperty(window, "__demoCoverAt", { value: (${coverInPage}), configurable: true }))`;
+
 function makeDemo(page, marks, t0, { view, font, theme, shots, shotDir }) {
   let mouse = { x: view.width / 2, y: view.height / 2 };
   let lastCaption = "";
@@ -319,37 +376,42 @@ function makeDemo(page, marks, t0, { view, font, theme, shots, shotDir }) {
     mouse = { x, y };
   }
 
-  // Current box of the target plus what a person would see at its centre. Kit overlays are
-  // pointer-events:none, so elementFromPoint looks through them to the app. An ancestor on
-  // top (e.g. a label or a wrapper) is accepted; anything else (a modal, its backdrop, a
-  // toast, a sticky bar) is reported as "tag#id.class".
-  async function aimAt(locator) {
+  // Current box of the target plus what a person would see at its centre (see coverInPage):
+  // .blocked is null or "tag#id.class" of a modal, backdrop, toast or sticky bar on top.
+  async function aimAt(locator, hoverOk = false) {
     const b = await locator.boundingBox();
     if (!b) throw new Error("target disappeared: " + locator);
-    const blocked = await locator.evaluate(el => {
-      const r = el.getBoundingClientRect();
-      const hit = el.ownerDocument.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-      if (!hit || hit === el || el.contains(hit) || hit.contains(el)) return null;
-      const label = hit.closest && hit.closest("label");
-      if (label && label.control === el) return null;
-      const cls = typeof hit.className === "string" ? hit.className.trim().split(/\s+/).filter(Boolean).slice(0, 2) : [];
-      // Tag/id/class only: the covering element's text may hold names or other personal data.
-      return hit.tagName.toLowerCase() + (hit.id ? "#" + hit.id : "") + cls.map(c => "." + c).join("");
-    }).catch(() => null);
+    const probe = (el, o) => (window.__demoCoverAt ? window.__demoCoverAt(el, o) : "__missing");
+    let blocked = await locator.evaluate(probe, { hoverOk }).catch(() => null);
+    if (blocked === "__missing") { // a fresh document (or an iframe): install the helper there
+      const frame = await locator.elementHandle().then(h => h.ownerFrame()).catch(() => null);
+      if (frame) await frame.evaluate(COVER_SCRIPT).catch(() => {});
+      blocked = await locator.evaluate(probe, { hoverOk }).catch(() => null);
+      if (blocked === "__missing") blocked = null;
+    }
     return { box: b, x: b.x + b.width / 2, y: b.y + b.height / 2, blocked };
   }
 
+  const pointerIn = b => mouse.x >= b.x && mouse.x <= b.x + b.width && mouse.y >= b.y && mouse.y <= b.y + b.height;
+
   // A modal that is fading out or a toast that is leaving gets a short (fast-forwarded) wait;
   // a cover that stays is returned in .blocked for the caller to refuse.
-  async function waitUncovered(locator, what, ms = 3000) {
-    let aim = await aimAt(locator);
+  async function waitUncovered(locator, what, hoverOk = false, ms = 3000) {
+    let aim = await aimAt(locator, hoverOk);
     if (!aim.blocked) return aim;
     await locator.evaluate(el => el.scrollIntoView({ block: "center", inline: "center" })).catch(() => {});
     const until = Date.now() + ms;
     await demo.waitApp(async () => {
-      while ((aim = await aimAt(locator)).blocked && Date.now() < until) await sleep(150);
+      while ((aim = await aimAt(locator, hoverOk)).blocked && Date.now() < until) await sleep(150);
     }, `wait until ${what} is not covered`);
     return aim;
+  }
+
+  // Caller has already waited for the target (boxOf).
+  async function highlightLocator(locator, label, ms, opts, hoverOk) {
+    const aim = await waitUncovered(locator, "the highlight target", hoverOk);
+    if (aim.blocked) throw new Error(`highlight "${label || ""}": the target is behind ${aim.blocked}; close the modal/popup first or highlight something inside it`);
+    return demo.highlightBox(aim.box, label, ms, opts);
   }
 
   async function boxOf(locator) {
@@ -383,10 +445,13 @@ function makeDemo(page, marks, t0, { view, font, theme, shots, shotDir }) {
     // A silent miss otherwise surfaces several steps later as an unrelated error.
     async click(locator, { slow = false, pauseBefore, pauseAfter, highlight } = {}) {
       const b = await boxOf(locator);
+      // Look before the pointer arrives: a cover that only shows on hover (a row action bar,
+      // an image overlay) is part of what the user clicks; one that is already there is not.
+      const hoverOk = pointerIn(b) || !(await aimAt(locator)).blocked;
       await moveTo(b.x + b.width / 2, b.y + b.height / 2);
-      if (highlight) await demo.highlight(locator, highlight, slow ? 2200 : 1400);
+      if (highlight) await highlightLocator(locator, highlight, slow ? 2200 : 1400, {}, hoverOk);
       await sleep(pauseBefore ?? (slow ? 1200 : 400));
-      const aim = await waitUncovered(locator, "the click target");
+      const aim = await waitUncovered(locator, "the click target", hoverOk);
       if (aim.blocked) throw new Error(`click target is covered by ${aim.blocked} at (${Math.round(aim.x)},${Math.round(aim.y)}); close or scroll away what covers it`);
       if (Math.hypot(aim.x - mouse.x, aim.y - mouse.y) > 3) await moveTo(aim.x, aim.y);
       await page.mouse.down();
@@ -447,7 +512,7 @@ function makeDemo(page, marks, t0, { view, font, theme, shots, shotDir }) {
       const srcs = what instanceof RegExp ? [{ s: what.source, f: what.flags.replace("g", "") }]
         : String(what).includes("ำ") ? [plain(what), plain(thaiCells(what))] : [plain(what)];
       const scope = within ? await within.elementHandle() : null;
-      const findOne = src => page.evaluate(({ src, scope, line }) => {
+      const findOne = (src, center) => page.evaluate(({ src, scope, line, center }) => {
         const re = new RegExp(src.s, src.f);
         const rootEl = scope || document.body;
         const LINE = ".xterm-rows > div, tr, li, p, pre, td, th, h1, h2, h3, h4, label, button, div";
@@ -463,15 +528,10 @@ function makeDemo(page, marks, t0, { view, font, theme, shots, shotDir }) {
         // match against whole lines: xterm.js and syntax highlighters split one line over many spans
         const done = new Set();
         let found = null, covered = null;
-        // What is on top at the match: the row itself, or a modal/backdrop/toast hiding it.
-        const coverOf = (row, box) => {
-          const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
-          if (!hit || row.contains(hit) || hit.contains(row)) return null;
-          const term = row.closest(".xterm");
-          if (term && term.contains(hit)) return null; // xterm's own selection/decoration layers
-          const cls = typeof hit.className === "string" ? hit.className.trim().split(/\s+/).filter(Boolean).slice(0, 2) : [];
-          return hit.tagName.toLowerCase() + (hit.id ? "#" + hit.id : "") + cls.map(c => "." + c).join("");
-        };
+        // What is on top at the match: the row itself, or a modal/backdrop/toast hiding it
+        // (coverInPage, installed just before this call). xterm's own layers never count.
+        const coverOf = (row, box) => (window.__demoCoverAt
+          ? window.__demoCoverAt(row, { x: box.x + box.width / 2, y: box.y + box.height / 2, allow: ".xterm" }) : null);
         for (const tn of textNodes(rootEl)) {
           if (!tn.nodeValue.trim()) continue;  // layout whitespace under <body> would make the whole page one "row"
           const row = tn.parentElement.closest(LINE) || tn.parentElement;
@@ -494,7 +554,9 @@ function makeDemo(page, marks, t0, { view, font, theme, shots, shotDir }) {
           const r = document.createRange();
           r.setStart(...at(m.index));
           r.setEnd(...at(m.index + m[0].length));
-          row.scrollIntoView({ block: "nearest" });
+          // "nearest" moves the page least; after a covered try, centre it so a sticky
+          // header or bottom bar is no longer on top of it
+          row.scrollIntoView({ block: center ? "center" : "nearest" });
           const rects = [...r.getClientRects()].filter(x => x.width > 0);
           if (!rects.length) continue;
           const first = rects[0];
@@ -510,11 +572,12 @@ function makeDemo(page, marks, t0, { view, font, theme, shots, shotDir }) {
           found = box;
         }
         return found ? { box: found } : covered ? { covered } : null;
-      }, { src, scope, line });
-      const find = async () => {
+      }, { src, scope, line, center });
+      const find = async (center = false) => {
+        await page.evaluate(COVER_SCRIPT).catch(() => {}); // again each try: the page may have navigated
         let covered = null;
         for (const src of srcs) {
-          const r = await findOne(src);
+          const r = await findOne(src, center);
           if (r && r.box) return { box: r.box };
           if (r && r.covered) covered = covered || r.covered;
         }
@@ -524,7 +587,7 @@ function makeDemo(page, marks, t0, { view, font, theme, shots, shotDir }) {
       await demo.waitApp(async () => {
         const start = Date.now();
         // text that is not there yet: up to 30 s; text hidden behind a modal/toast: up to 3 s
-        while (!(found = await find())?.box && Date.now() - start < (found?.covered ? 3000 : 30000)) await sleep(250);
+        while (!(found = await find(Boolean(found?.covered)))?.box && Date.now() - start < (found?.covered ? 3000 : 30000)) await sleep(250);
       }, "wait for text");
       if (found?.covered) throw new Error(`highlightText "${what}": the text is behind ${found.covered}; close the modal/popup first or highlight text inside it`);
       const b = found?.box;
@@ -537,10 +600,8 @@ function makeDemo(page, marks, t0, { view, font, theme, shots, shotDir }) {
     // Refuses a target hidden behind a modal/backdrop/toast: the frame would point at something
     // the viewer cannot see. Close the modal in run() first, or highlight something inside it.
     async highlight(locator, label, ms = 2200, opts = {}) {
-      await boxOf(locator);
-      const aim = await waitUncovered(locator, "the highlight target");
-      if (aim.blocked) throw new Error(`highlight "${label || ""}": the target is behind ${aim.blocked}; close the modal/popup first or highlight something inside it`);
-      return demo.highlightBox(aim.box, label, ms, opts);
+      // With the pointer already on the target, its own hover overlay is what the viewer sees.
+      return highlightLocator(locator, label, ms, opts, pointerIn(await boxOf(locator)));
     },
 
     // Highlight a box in page pixels ({ x, y, width, height }). Refuses a box covering most of the

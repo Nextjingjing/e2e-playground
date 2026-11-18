@@ -169,12 +169,72 @@ test("a setup retry that succeeds records take 1 without --retake", async t => {
   await runCase(f.config, { ...f.options, retake: true }); // the real second take is still available
 });
 
-test("setup-only rehearses setup without using a take", async t => {
+test("setup-only rehearses setup without using a take, and rehearsals are capped", async t => {
   const f = fixture(t);
-  assert.deepEqual(await runCase(f.config, { ...f.options, setupOnly: true }), { setup: "ok" });
+  assert.deepEqual(await runCase(f.config, { ...f.options, setupOnly: true }), { setup: "ok", rehearsals: 1 });
   assert.deepEqual(f.events, ["setup"]);
-  assert.ok(!fs.existsSync(path.join(f.root, "final.job.json")));
+  const job = JSON.parse(fs.readFileSync(path.join(f.root, "final.job.json"), "utf8"));
+  assert.equal(job.record, undefined, "a rehearsal uses no take");
   await assert.rejects(runCase(f.config, { ...f.options, setupOnly: true, retake: true }), /choose one/);
+  await runCase(f.config, { ...f.options, setupOnly: true });
+  await runCase(f.config, { ...f.options, setupOnly: true });
+  await assert.rejects(runCase(f.config, { ...f.options, setupOnly: true }), /rehearsed 3 times/);
+  assert.equal(f.events.filter(e => e === "setup").length, 3);
+  await runCase(f.config, f.options); // the take itself is still available
+  assert.equal(JSON.parse(fs.readFileSync(path.join(f.root, "final.job.json"), "utf8")).record.attempts, 1);
+});
+
+test("after the setup-failure cap, a passing rehearsal allows exactly one more try", async t => {
+  const f = fixture(t);
+  let fail = true;
+  f.config.setup = async () => { f.events.push("setup"); if (fail) throw new Error("select did not stick"); };
+  for (let i = 0; i < 3; i++) await assert.rejects(runCase(f.config, f.options), /did not stick/);
+  await assert.rejects(runCase(f.config, f.options), /setup failed 3 times; fix setup\(\), then prove it with --setup-only/);
+  await assert.rejects(runCase(f.config, { ...f.options, retake: true }), /setup failed 3 times/);
+  await assert.rejects(runCase(f.config, { ...f.options, setupOnly: true }), /did not stick/); // failed rehearsal unlocks nothing
+  await assert.rejects(runCase(f.config, f.options), /setup failed 3 times/);
+  fail = false;
+  await runCase(f.config, { ...f.options, setupOnly: true });
+  await runCase(f.config, f.options);
+  const job = JSON.parse(fs.readFileSync(path.join(f.root, "final.job.json"), "utf8"));
+  assert.equal(job.record.attempts, 1);
+  assert.equal(job.record.stage, "recorded");
+});
+
+test("a runner killed during setup leaves a stale lock and stage 'setup': both recover without --retake", async t => {
+  const f = fixture(t);
+  const gone = require("node:child_process").spawnSync(process.execPath, ["-e", "process.stdout.write(String(process.pid))"], { encoding: "utf8" });
+  fs.writeFileSync(path.join(f.root, "final.job.json"), JSON.stringify({ schema: 1, status: "recording",
+    record: { attempts: 1, caseKey: "case-v1", stage: "setup", verification: "pending" } }));
+  fs.writeFileSync(path.join(f.root, "final.job.json.lock"), JSON.stringify({ pid: Number(gone.stdout), at: Date.now() }));
+  await runCase(f.config, f.options);
+  const job = JSON.parse(fs.readFileSync(path.join(f.root, "final.job.json"), "utf8"));
+  assert.equal(job.record.attempts, 1, "a killed setup filmed nothing, so it keeps the take");
+  assert.equal(job.record.setupFailures, 1);
+  assert.ok(!fs.existsSync(path.join(f.root, "final.job.json.lock")));
+});
+
+test("a lock held by a live runner is refused with its pid", async t => {
+  const f = fixture(t);
+  fs.writeFileSync(path.join(f.root, "final.job.json.lock"), JSON.stringify({ pid: process.pid, at: Date.now() }));
+  await assert.rejects(runCase(f.config, f.options), new RegExp(`in use by run pid ${process.pid}`));
+  assert.ok(fs.existsSync(path.join(f.root, "final.job.json.lock")), "a live run's lock stays");
+  assert.deepEqual(f.events, []);
+});
+
+test("an unwritable progress log neither fails the run nor leaves the lock behind", async t => {
+  const f = fixture(t);
+  fs.mkdirSync(path.join(f.root, "final.progress.log")); // writeFileSync/appendFileSync both fail on a directory
+  await runCase(f.config, f.options);
+  assert.ok(!fs.existsSync(path.join(f.root, "final.job.json.lock")));
+});
+
+test("long editing writes heartbeat lines so a watcher does not report STALL", async t => {
+  const f = fixture(t);
+  const edit = async () => { await new Promise(r => setTimeout(r, 130)); return { status: "needs-review" }; };
+  await runCase(f.config, { ...f.options, edit, heartbeatMs: 40 });
+  const text = fs.readFileSync(path.join(f.root, "final.progress.log"), "utf8");
+  assert.ok((text.match(/ EDIT still encoding \(\d+s\)/g) || []).length >= 2, text);
 });
 
 test("progress log streams phases and captions, and a scrubbed failure reason", async t => {
@@ -199,6 +259,19 @@ test("progress log streams phases and captions, and a scrubbed failure reason", 
   assert.ok(!failed.includes("hunter2") && !failed.includes("Jane") && !failed.includes("third line"));
 });
 
+test("failure text hides redact.text in any case, built-in PII patterns and login env values", async t => {
+  const f = fixture(t);
+  process.env.DEMO_USER = "jdoe_ops";
+  t.after(() => { delete process.env.DEMO_USER; });
+  f.config.redact = { text: ["Jane Doe"] };
+  f.config.setup = async ({ log }) => { log("row for JANE DOE ready"); throw new Error("no row for JANE DOE (jane.doe@corp.com), user jdoe_ops"); };
+  await assert.rejects(runCase(f.config, f.options));
+  const text = fs.readFileSync(path.join(f.root, "final.progress.log"), "utf8");
+  assert.match(text, / FAIL setup: no row for \[redacted\] \(\[redacted\]\), user \[redacted\]/);
+  assert.match(text, / SETUP row for \[redacted\] ready/);
+  assert.ok(!/jane|doe|corp\.com|jdoe/i.test(text), text);
+});
+
 test("CLI exits even when setup leaves a handle open, with a readable reason", t => {
   const { spawnSync } = require("node:child_process");
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "demo runner cli "));
@@ -218,4 +291,34 @@ test("CLI exits even when setup leaves a handle open, with a readable reason", t
   assert.match(result.stderr, /case failed: select did not stick for \[redacted\]/);
   assert.ok(!result.stderr.includes("s3cret-pw"));
   assert.match(fs.readFileSync(path.join(root, "out", "final.progress.log"), "utf8"), / FAIL setup: select did not stick/);
+});
+
+test("CLI error line applies the case's redaction, not only env secrets", t => {
+  const { spawnSync } = require("node:child_process");
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "demo runner cli "));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const caseFile = path.join(root, "case.cjs");
+  fs.writeFileSync(caseFile, `module.exports = {
+    output: "out/final.mp4", baseURL: "http://127.0.0.1:9", title: { title: "T", lines: [] },
+    redact: { text: ["Jane Doe"] }, run: async () => {},
+    setup: async () => { throw new Error("no row for JANE DOE (jane.doe@corp.com)"); },
+  };`);
+  const result = spawnSync(process.execPath, [path.join(__dirname, "..", "run-case.cjs"), caseFile], { encoding: "utf8", timeout: 20000 });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /case failed: no row for \[redacted\] \(\[redacted\]\)/);
+  assert.ok(!/jane|corp\.com/i.test(result.stderr), result.stderr);
+});
+
+test("--storyboard exits 3 when the storyboard is incomplete, like storyboard.cjs", t => {
+  const { spawnSync } = require("node:child_process");
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "demo runner cli "));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const caseFile = path.join(root, "case.cjs");
+  fs.writeFileSync(caseFile, `module.exports = {
+    output: "out/final.mp4", baseURL: "http://127.0.0.1:9", title: { title: "T", lines: [] },
+    run: async ({ demo }) => { await demo.caption("one"); throw new Error("needs the real page"); },
+  };`);
+  const result = spawnSync(process.execPath, [path.join(__dirname, "..", "run-case.cjs"), caseFile, "--storyboard"], { encoding: "utf8", timeout: 20000 });
+  assert.equal(result.status, 3, result.stderr);
+  assert.match(result.stdout, /Storyboard incomplete/);
 });

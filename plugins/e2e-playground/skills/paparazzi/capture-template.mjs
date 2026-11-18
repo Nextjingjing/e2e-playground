@@ -36,12 +36,35 @@ await page.addStyleTag({ content: "*,*::before,*::after{animation:none!important
 await page.screenshot({ path: `${assets}/overview.png`, fullPage: true });
 
 // --- Never mark what the reader cannot see ---
-// null when the element itself is on top at its centre, else "tag#id.class" of what covers
-// it (an open modal, its backdrop, a toast). Badges and redaction bars are pointer-events:none.
+// null when the element itself (or its child/parent, light or shadow DOM) is on top at its
+// centre, else "tag#id.class" of what covers it (an open modal, its backdrop, a toast). Badges
+// and redaction bars are pointer-events:none, so they are looked through; a pointer-events:none
+// target (a floating label) is made hittable for the probe.
 const coveredBy = (locator) => locator.evaluate((el) => {
+  const doc = el.ownerDocument;
+  const parentOf = (n) => n.assignedSlot || (n.parentNode && n.parentNode.nodeType === 11 && n.parentNode.host) || n.parentNode;
+  const within = (outer, inner) => { for (let n = inner; n; n = parentOf(n)) if (n === outer) return true; return false; };
   const r = el.getBoundingClientRect();
-  const hit = el.ownerDocument.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-  if (!hit || hit === el || el.contains(hit) || hit.contains(el)) return null;
+  const x = r.left + r.width / 2, y = r.top + r.height / 2;
+  const pick = () => {
+    let hit = doc.elementFromPoint(x, y);
+    while (hit && hit.shadowRoot) { // look inside open shadow roots (web components)
+      const inner = hit.shadowRoot.elementFromPoint(x, y);
+      if (!inner || inner === hit) break;
+      hit = inner;
+    }
+    return hit;
+  };
+  let hit;
+  if (getComputedStyle(el).pointerEvents === "none") {
+    const style = el.getAttribute("style");
+    el.style.setProperty("pointer-events", "auto", "important");
+    try { hit = pick(); } finally {
+      el.getAttribute("style"); // Chrome writes the attribute lazily: sync it now, or it comes back as style=""
+      if (style === null) el.removeAttribute("style"); else el.setAttribute("style", style);
+    }
+  } else hit = pick();
+  if (!hit || within(el, hit) || within(hit, el)) return null;
   const label = hit.closest && hit.closest("label");
   if (label && label.control === el) return null;
   const cls = typeof hit.className === "string" ? hit.className.trim().split(/\s+/).filter(Boolean).slice(0, 2) : [];

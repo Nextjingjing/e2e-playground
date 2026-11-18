@@ -82,3 +82,77 @@ test("highlight and click refuse targets hidden behind a modal, and wait for one
   await demo.click(p.locator("#save"));
   assert.equal(await p.locator("#log").innerText(), "S;");
 });
+
+const widgets = `<!doctype html><meta charset=utf-8>
+<style>
+  body{font:16px sans-serif;margin:20px}
+  .field{position:relative;width:300px;margin:20px 0}
+  .field label{position:absolute;left:12px;top:12px;pointer-events:none;color:#666}
+  .field input{width:100%;padding:12px;font:16px sans-serif}
+  .card{position:relative;width:220px;height:70px;background:#eee;margin:16px 0}
+  .card .ov{display:none;position:absolute;inset:0;background:rgba(0,0,0,.4)}
+  .card:hover .ov{display:block}
+  .wrap{position:relative;height:150px}
+  .menu{position:absolute;z-index:5;top:28px;left:0;width:240px;height:110px;margin:0;background:#fff;border:1px solid #999}
+  #under{position:absolute;top:70px;left:10px}
+  table{border-collapse:collapse;margin-top:20px}
+  th{position:sticky;top:0;height:60px;background:#fff}
+  td{height:22px;padding:0 8px}
+</style>
+<div class=field><input id=email><label id=lbl>Email address</label></div>
+<my-btn></my-btn>
+<div class=card onclick="log.textContent+='C;'"><span id=cardtext>Order 42</span><div class=ov></div></div>
+<div class=wrap><button id=toggle>Menu</button><ul class=menu><li>Profile</li></ul><button id=under onclick="log.textContent+='U;'">Under</button></div>
+<div id=log></div>
+<table><thead><tr><th>Item</th></tr></thead><tbody>${Array.from({ length: 80 }, (_, i) => `<tr><td>Lot ${1001 + i}</td></tr>`).join("")}</tbody></table>
+<script>
+  customElements.define("my-btn", class extends HTMLElement { constructor() { super();
+    this.attachShadow({ mode: "open" }).innerHTML = "<button id=inner>Shadow Save</button>";
+    this.shadowRoot.getElementById("inner").onclick = () => { log.textContent += "X;"; }; } });
+</script>`;
+
+test("covers: shadow DOM, pointer-events:none targets, hover overlays and sticky headers are handled; an open menu is still refused", {
+  skip: projectDir ? false : "no Playwright Chromium found (set DEMO_TEST_PLAYWRIGHT_DIR)",
+  timeout: 120000,
+}, async t => {
+  const kit = require("../demo-kit.cjs");
+  const server = http.createServer((_, res) => { res.setHeader("content-type", "text/html"); res.end(widgets); }).listen(0);
+  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "demo cover "));
+  const s = await kit.startSession({ projectDir, outDir, name: "widgets",
+    baseURL: `http://127.0.0.1:${server.address().port}`, startUrl: "/" });
+  t.after(async () => {
+    await s.finish().catch(() => {});
+    await s.browser.close().catch(() => {});
+    server.close();
+    fs.rmSync(outDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+  });
+  const { page: p, demo } = s;
+  const log = () => p.locator("#log").innerText();
+
+  // A button inside a web component's shadow root is the click target, not "covered by" its host.
+  await demo.click(p.locator("#inner"));
+  assert.equal(await log(), "X;");
+
+  // A floating label (pointer-events:none) drawn over its input can be pointed at, and the
+  // probe leaves its style attribute as it was.
+  await demo.highlight(p.locator("#lbl"), "Email", 200);
+  await demo.highlightText("Email address", "Email", 200);
+  assert.equal(await p.locator("#lbl").getAttribute("style"), null);
+
+  // An overlay the hover itself reveals is part of the card the user clicks.
+  await demo.click(p.locator("#cardtext"), { highlight: "this order" });
+  assert.equal(await log(), "X;C;");
+
+  // A menu that is already open over the target is a real cover: refuse, never click the menu.
+  await assert.rejects(demo.click(p.locator("#under")), /covered by ul\.menu/);
+  assert.equal(await log(), "X;C;");
+
+  // Text scrolled under a sticky table header: re-centred instead of failing.
+  await p.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  const hl = demo.highlightText("Lot 1005", "Fifth", 600);
+  await new Promise(r => setTimeout(r, 400));
+  await hl;
+  const row = await p.getByText("Lot 1005", { exact: true }).boundingBox();
+  const th = await p.locator("th").boundingBox();
+  assert.ok(row.y >= th.y + th.height, `row at y=${row.y} must be clear of the header ending at ${th.y + th.height}`);
+});

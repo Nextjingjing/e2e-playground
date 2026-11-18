@@ -13,6 +13,11 @@ const crypto = require("node:crypto");
 const { readMs } = require("./demo-kit.cjs");
 
 const CALL_BUDGET = 5000;
+const TIME_BUDGET_MS = 20000; // a run() that awaits real timers in a loop must not hang the preview
+// Yes/no questions about the live page. On the fake page nothing is there, so they answer as
+// for a missing element and the "nothing found" branch is the one shown.
+const STATE_CHECKS = { isVisible: false, isHidden: true, isChecked: false, isEnabled: false,
+  isDisabled: false, isEditable: false, isClosed: false };
 class StoryboardStop extends Error {}
 
 const short = value => {
@@ -45,9 +50,12 @@ function describe(parent, method, args) {
   }
 }
 
-function makeFakes(events) {
-  let calls = 0, live = 0;
-  const tick = () => { if (++calls > CALL_BUDGET) throw new StoryboardStop(`stopped after ${CALL_BUDGET} page calls (run() probably loops on live page state)`); };
+function makeFakes(events, deadline = Infinity) {
+  let calls = 0, live = 0, checks = 0;
+  const tick = () => {
+    if (++calls > CALL_BUDGET) throw new StoryboardStop(`stopped after ${CALL_BUDGET} page calls (run() probably loops on live page state)`);
+    if (Date.now() > deadline) throw new StoryboardStop(`stopped after ${TIME_BUDGET_MS / 1000} s (run() probably waits on live page state)`);
+  };
   const pageEvent = { goto: url => `open ${url}`, reload: () => "reload page", goBack: () => "go back" };
 
   // Shared traps: awaiting a fake gives the fake back; using it as a value counts as "live".
@@ -83,6 +91,7 @@ function makeFakes(events) {
         if (isPage && prop === "waitForTimeout") events.push({ kind: "pause", secs: Math.min(Number(args[0]) || 0, 2500) / 1000 });
         if (owner === "keyboard" && prop === "press") events.push({ kind: "key", text: `press ${args[0]}`, secs: 0.3 });
         if (owner === "keyboard" && (prop === "type" || prop === "insertText")) events.push({ kind: "key", text: `type ${short(args[0])}`, secs: String(args[0] || "").length * 0.05 });
+        if (Object.hasOwn(STATE_CHECKS, prop)) { checks++; return STATE_CHECKS[prop]; } // a real boolean, not a truthy fake
         return chain(describe(base, prop, args));
       },
       get(_, inner) {
@@ -127,7 +136,7 @@ function makeFakes(events) {
       return async () => { events.push({ kind: "other", text: `demo.${prop}()`, secs: 1 }); };
     },
   });
-  return { page: chain("", true), demo, liveCount: () => live };
+  return { page: chain("", true), demo, liveCount: () => live, checkCount: () => checks };
 }
 
 function scenes(events) {
@@ -144,17 +153,22 @@ function scenes(events) {
   return list;
 }
 
-const clock = secs => `${Math.floor(secs / 60)}:${String(Math.round(secs % 60)).padStart(2, "0")}`;
+const clock = secs => { const s = Math.round(secs); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
 const cell = text => String(text).replace(/\|/g, "\\|").replace(/\n/g, " ");
 
-async function storyboard(config, { caseFile = "case.cjs", caseKey = null, baseDir = process.cwd(), write = true } = {}) {
+async function storyboard(config, { caseFile = "case.cjs", caseKey = null, baseDir = process.cwd(), write = true, timeLimitMs = TIME_BUDGET_MS } = {}) {
   if (typeof config.run !== "function" || !config.output || !config.title?.title)
     throw new Error("case needs output, title.title and an async run({page, demo}) function");
   const events = [];
-  const fakes = makeFakes(events);
-  let stopped = null;
-  try { await config.run({ page: fakes.page, demo: fakes.demo }); }
+  const fakes = makeFakes(events, Date.now() + timeLimitMs);
+  let stopped = null, timer;
+  // The call budget catches loops on the fake page; the timer catches run() code that awaits
+  // real timers or I/O without touching the page.
+  const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new StoryboardStop(
+    `stopped after ${Math.round(timeLimitMs / 1000)} s (run() probably waits on live page state)`)), timeLimitMs); });
+  try { await Promise.race([config.run({ page: fakes.page, demo: fakes.demo }), timeout]); }
   catch (error) { stopped = error instanceof StoryboardStop ? error.message : `run() threw on the fake page: ${String(error?.message || error).split("\n")[0]}`; }
+  finally { clearTimeout(timer); }
   const title = config.title;
   const titleSecs = (readMs([title.tag, title.title, ...(title.lines || [])].filter(Boolean)) + 1400) / 1000;
   const list = scenes(events);
@@ -174,6 +188,7 @@ async function storyboard(config, { caseFile = "case.cjs", caseKey = null, baseD
     `**≈ ${clock(total)} after editing** (${steps} captioned steps; app waits counted as 0.6 s, long pauses as ≤ 2.5 s).`,
   ];
   if (fakes.liveCount()) md.push("", `${fakes.liveCount()} value(s) come from the live page and show as ‹live: …›; the real video shows the actual value.`);
+  if (fakes.checkCount()) md.push("", `${fakes.checkCount()} live check(s) such as isVisible() were answered "not on screen", so steps that only happen when something is shown are missing here.`);
   if (stopped) md.push("", `**Storyboard incomplete:** ${stopped}. Scenes after this point depend on the real page.`);
   const summary = { caseKey, steps, seconds: Math.round(total), stopped };
   if (write) {
@@ -200,7 +215,7 @@ async function main(args) {
   return result.stopped ? 3 : 0;
 }
 
-module.exports = { storyboard };
+module.exports = { storyboard, clock };
 if (require.main === module) main(process.argv.slice(2)).then(
   code => process.exit(code),
   error => { console.error(String(error?.message || error).split("\n")[0]); process.exit(1); });

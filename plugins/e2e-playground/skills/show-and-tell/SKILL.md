@@ -25,8 +25,11 @@ HANDOFF/FLOWS/STATUS files for one case. Music is opt-in; captions, title and pr
    | work time (ETA) | ~20 min | 1–2 h+ (each extra role/page, UI-driven setup or real scan adds a lot) |
    | test data used | <1 record> | <n records> |
 
-   Always offer the small version that proves the point. Skip the table only when the user
-   already gave an exact shot list. When the user asks for more later, extend it then.
+   Always offer the small version that proves the point. Under the table, ask which
+   version with a choice box (AskUserQuestion in Claude Code; a short numbered question in
+   other tools): small / full, with "change something" left to the free-text answer.
+   Skip the table only when the user already gave an exact shot list. When the user asks
+   for more later, extend it then.
 1. **Get the facts once.** Find the app URL, start screen, smallest test item, steps and
    expected result for the agreed version. Reuse an existing case script before scouting.
    Choose `<app>/demo-out/` when the user supplied no output path. Ask only for facts you
@@ -46,7 +49,8 @@ HANDOFF/FLOWS/STATUS files for one case. Music is opt-in; captions, title and pr
      user when it differs from step 0 or they asked to see it. Fix the case first, not
      after a 5-minute take.
    - `node <skill>/scripts/run-case.cjs <work>/case.cjs --setup-only` rehearses the
-     off-camera setup alone (no take used).
+     off-camera setup alone. It uses no take but does use data, so it is counted (max 3).
+     Use it when `setup()` is new or has failed, not before every take.
 
    Then record. Always start it **in the background with a watcher at the same time** (see "Watch every run"):
 
@@ -76,10 +80,11 @@ HANDOFF/FLOWS/STATUS files for one case. Music is opt-in; captions, title and pr
 
 No automatic retakes: each take can move real data. One initial take plus one explicit
 `run-case.cjs <case.cjs> --retake` is the budget; prepare fresh data in `setup()` first.
-A failed `setup()` films nothing, so it keeps the same take number. Re-run without
-`--retake`; after 3 setup failures the runner stops. **Never delete or edit `.job.json`,
-`.lock` or `.work/` to reset a counter.** When the budget blocks you, report and let the
-user decide. Stop and report a product mismatch instead of faking it or spending more takes
+A failed `setup()` films nothing, so it keeps the same take number. So does a runner that
+was killed or hung during setup. Re-run without `--retake`. After 3 setup failures the
+runner stops: fix `setup()`, and a passing `--setup-only` then allows one more try. A lock
+left by a dead runner clears itself. **Never delete or edit `.job.json`, `.lock` or
+`.work/` to reset a counter.** When the budget blocks you, report and let the user decide. Stop and report a product mismatch instead of faking it or spending more takes
 on polish. Update the case only when a fact changes; the job file handles phase status.
 
 ## Watch every run
@@ -87,18 +92,21 @@ on polish. Update the case only when a fact changes; the job file handles phase 
 Never wait blind. A run that failed in its first minute once sat unnoticed for 2 h 16 min,
 because its process never exited, so no "finished" notice came.
 
-- Start `watch-case.cjs` within a minute of the runner, as a streamed monitor if your tool
-  has one; otherwise as a second background job. It prints `STEP`/`SETUP` progress lines.
+- Start `watch-case.cjs` together with the runner, as a streamed monitor if your tool
+  has one; otherwise as a second background job. An old result left in the log is not
+  mistaken for the new run. It prints `STEP`/`SETUP` progress lines.
   It exits on `DONE` (0), on `FAIL <phase>: <reason>` (1), or on `DEAD` (2), which means the
   runner vanished without a result. It prints `STALL` when nothing new arrives for
-  `--stall` s.
+  `--stall` s. While a clip is encoding, `EDIT still encoding (Ns)` arrives every minute.
+  Those lines are normal.
 - Do not end a turn with "I'll check when it finishes" unless the watcher is confirmed
   running. If starting it fails, fix that first, e.g. load the monitor tool's schema.
 - On `FAIL` or `STALL`, act now. Read the reason, then `take-N/fail.png` if listed (`SHOT`),
   or the raw clip's last frame. Do not keep waiting.
 - When the user asks "done yet?", answer from the last `STEP` line and elapsed time. With a
   storyboard of the same case file, steps read `STEP 4/9`. Monitors
-  that expire (e.g. 30 min caps) only stop the watcher; re-arm it, the runner keeps going.
+  that expire (e.g. 30 min caps) only stop the watcher. Re-arm it with the same command:
+  it picks up the take that is still running.
 - Watch dry runs and custom scripts the same way: give them a progress line per step.
 
 ## Failures already paid for (2026-11-18, one clip took 4 h and was cancelled)
@@ -116,7 +124,8 @@ because its process never exited, so no "finished" notice came.
   now check what is really on top. They wait ≤ 3 s for a closing modal or toast, then fail
   and name what covers the target. In `run()`, close the modal before pointing behind it.
 - **Budget bypass.** Setup failures used up both takes. The agent then deleted the job file
-  3× to reset the counter. Setup failures no longer cost a take; never reset a counter.
+  3× to reset the counter. Setup failures (and killed setups) no longer cost a take, and a
+  stale lock clears itself. Never reset a counter.
 - **Story too big, and the user could not see it coming.** A multi-role story with real scans
   needed 5 helper scripts and many dry runs. The user later accepted "just show the number
   drop" and said they could not tell what video they would get. Step 0's storyboard and
