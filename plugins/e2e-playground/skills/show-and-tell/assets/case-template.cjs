@@ -1,5 +1,8 @@
 // Copy next to your app; replace only the facts/actions. Paths are relative to THIS file.
-// node <skill>/scripts/run-case.cjs ./case.cjs
+// node <skill>/scripts/run-case.cjs ./case.cjs --storyboard   # preview scenes + length, no browser/data
+// node <skill>/scripts/run-case.cjs ./case.cjs --setup-only   # rehearse setup, no take used
+// node <skill>/scripts/run-case.cjs ./case.cjs                # background, then:
+// node <skill>/scripts/watch-case.cjs <output .mp4>            # watcher: STEP lines, exits on DONE/FAIL/DEAD
 module.exports = {
   projectDir: ".", // folder containing node_modules/playwright or @playwright/test
   baseURL: "http://127.0.0.1:3000",
@@ -9,7 +12,9 @@ module.exports = {
   music: false, // opt in only when requested; no numpy needed for a silent clip
   redact: { selectors: [".user-badge"] }, // add names/identifiers from environment, never literals
 
-  // Optional setup(): prepare fresh test data off camera through supported app facilities.
+  // Optional setup({ log }): prepare fresh test data off camera through supported app facilities.
+  // Call log("queue X ready") after each step and check each UI value really stuck (polling pages reset forms).
+  // Close any browser it opens (the runner exits anyway, but leaks hide the real error).
   // Shared data: record the backup path in a comment, without credentials. Never restore automatically.
   // Optional login(page): use process.env.DEMO_USER and process.env.DEMO_PASSWORD off camera.
 

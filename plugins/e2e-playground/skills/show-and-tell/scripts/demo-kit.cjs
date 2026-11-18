@@ -319,6 +319,39 @@ function makeDemo(page, marks, t0, { view, font, theme, shots, shotDir }) {
     mouse = { x, y };
   }
 
+  // Current box of the target plus what a person would see at its centre. Kit overlays are
+  // pointer-events:none, so elementFromPoint looks through them to the app. An ancestor on
+  // top (e.g. a label or a wrapper) is accepted; anything else (a modal, its backdrop, a
+  // toast, a sticky bar) is reported as "tag#id.class".
+  async function aimAt(locator) {
+    const b = await locator.boundingBox();
+    if (!b) throw new Error("target disappeared: " + locator);
+    const blocked = await locator.evaluate(el => {
+      const r = el.getBoundingClientRect();
+      const hit = el.ownerDocument.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      if (!hit || hit === el || el.contains(hit) || hit.contains(el)) return null;
+      const label = hit.closest && hit.closest("label");
+      if (label && label.control === el) return null;
+      const cls = typeof hit.className === "string" ? hit.className.trim().split(/\s+/).filter(Boolean).slice(0, 2) : [];
+      // Tag/id/class only: the covering element's text may hold names or other personal data.
+      return hit.tagName.toLowerCase() + (hit.id ? "#" + hit.id : "") + cls.map(c => "." + c).join("");
+    }).catch(() => null);
+    return { box: b, x: b.x + b.width / 2, y: b.y + b.height / 2, blocked };
+  }
+
+  // A modal that is fading out or a toast that is leaving gets a short (fast-forwarded) wait;
+  // a cover that stays is returned in .blocked for the caller to refuse.
+  async function waitUncovered(locator, what, ms = 3000) {
+    let aim = await aimAt(locator);
+    if (!aim.blocked) return aim;
+    await locator.evaluate(el => el.scrollIntoView({ block: "center", inline: "center" })).catch(() => {});
+    const until = Date.now() + ms;
+    await demo.waitApp(async () => {
+      while ((aim = await aimAt(locator)).blocked && Date.now() < until) await sleep(150);
+    }, `wait until ${what} is not covered`);
+    return aim;
+  }
+
   async function boxOf(locator) {
     await demo.waitApp(() => locator.waitFor({ state: "visible", timeout: 30000 }), "wait for element");
     await locator.scrollIntoViewIfNeeded().catch(() => {});
@@ -345,11 +378,17 @@ function makeDemo(page, marks, t0, { view, font, theme, shots, shotDir }) {
     },
 
     // Real mouse click with a visible approach. slow=true for the steps that matter.
+    // Before pressing, re-aim and check the target is really what is under the pointer: the
+    // page may have scrolled/re-rendered during the pause, or an app bar/popup may cover it.
+    // A silent miss otherwise surfaces several steps later as an unrelated error.
     async click(locator, { slow = false, pauseBefore, pauseAfter, highlight } = {}) {
       const b = await boxOf(locator);
       await moveTo(b.x + b.width / 2, b.y + b.height / 2);
       if (highlight) await demo.highlight(locator, highlight, slow ? 2200 : 1400);
       await sleep(pauseBefore ?? (slow ? 1200 : 400));
+      const aim = await waitUncovered(locator, "the click target");
+      if (aim.blocked) throw new Error(`click target is covered by ${aim.blocked} at (${Math.round(aim.x)},${Math.round(aim.y)}); close or scroll away what covers it`);
+      if (Math.hypot(aim.x - mouse.x, aim.y - mouse.y) > 3) await moveTo(aim.x, aim.y);
       await page.mouse.down();
       await sleep(90);
       await page.mouse.up();
@@ -423,7 +462,16 @@ function makeDemo(page, marks, t0, { view, font, theme, shots, shotDir }) {
         };
         // match against whole lines: xterm.js and syntax highlighters split one line over many spans
         const done = new Set();
-        let found = null;
+        let found = null, covered = null;
+        // What is on top at the match: the row itself, or a modal/backdrop/toast hiding it.
+        const coverOf = (row, box) => {
+          const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+          if (!hit || row.contains(hit) || hit.contains(row)) return null;
+          const term = row.closest(".xterm");
+          if (term && term.contains(hit)) return null; // xterm's own selection/decoration layers
+          const cls = typeof hit.className === "string" ? hit.className.trim().split(/\s+/).filter(Boolean).slice(0, 2) : [];
+          return hit.tagName.toLowerCase() + (hit.id ? "#" + hit.id : "") + cls.map(c => "." + c).join("");
+        };
         for (const tn of textNodes(rootEl)) {
           if (!tn.nodeValue.trim()) continue;  // layout whitespace under <body> would make the whole page one "row"
           const row = tn.parentElement.closest(LINE) || tn.parentElement;
@@ -455,27 +503,44 @@ function makeDemo(page, marks, t0, { view, font, theme, shots, shotDir }) {
           const rr = row.getBoundingClientRect();
           const box = line ? { x: rr.left, y: first.top, width: rr.width, height: first.height }
             : { x: left, y: first.top, width: right - left, height: first.height };
+          const cover = coverOf(row, box);
+          if (cover) { covered = covered || cover; continue; } // look for a visible copy (e.g. inside the modal)
           // in a terminal the newest output (lowest match) is the result; an earlier hit is usually the typed command
-          if (!row.closest(".xterm-rows")) return box;
+          if (!row.closest(".xterm-rows")) return { box };
           found = box;
         }
-        return found;
+        return found ? { box: found } : covered ? { covered } : null;
       }, { src, scope, line });
-      const find = async () => { for (const src of srcs) { const b = await findOne(src); if (b) return b; } return null; };
-      let b = null;
+      const find = async () => {
+        let covered = null;
+        for (const src of srcs) {
+          const r = await findOne(src);
+          if (r && r.box) return { box: r.box };
+          if (r && r.covered) covered = covered || r.covered;
+        }
+        return covered ? { covered } : null;
+      };
+      let found = null;
       await demo.waitApp(async () => {
-        const until = Date.now() + 30000;
-        while (!(b = await find()) && Date.now() < until) await sleep(250);
+        const start = Date.now();
+        // text that is not there yet: up to 30 s; text hidden behind a modal/toast: up to 3 s
+        while (!(found = await find())?.box && Date.now() - start < (found?.covered ? 3000 : 30000)) await sleep(250);
       }, "wait for text");
+      if (found?.covered) throw new Error(`highlightText "${what}": the text is behind ${found.covered}; close the modal/popup first or highlight text inside it`);
+      const b = found?.box;
       if (!b) throw new Error(`highlightText: "${what}" is not on screen as text. A canvas/WebGL terminal draws no DOM text — use xterm.js's DOM renderer (see references/surfaces.md), or highlight a known box with demo.highlightBox().`);
       await moveTo(b.x + b.width / 2, b.y + b.height / 2);
       return demo.highlightBox(b, label, ms, { shot });
     },
 
     // highlight(locator, label, ms, { shot: "title" }) also saves a still while it shows.
+    // Refuses a target hidden behind a modal/backdrop/toast: the frame would point at something
+    // the viewer cannot see. Close the modal in run() first, or highlight something inside it.
     async highlight(locator, label, ms = 2200, opts = {}) {
-      const b = await boxOf(locator);
-      return demo.highlightBox(b, label, ms, opts);
+      await boxOf(locator);
+      const aim = await waitUncovered(locator, "the highlight target");
+      if (aim.blocked) throw new Error(`highlight "${label || ""}": the target is behind ${aim.blocked}; close the modal/popup first or highlight something inside it`);
+      return demo.highlightBox(aim.box, label, ms, opts);
     },
 
     // Highlight a box in page pixels ({ x, y, width, height }). Refuses a box covering most of the

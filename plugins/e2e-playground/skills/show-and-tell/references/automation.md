@@ -21,7 +21,7 @@ Case fields:
 | `output` | final `.mp4`; all other generated paths derive from it |
 | `title` | `{tag, title, lines}` for the fixed title-card template |
 | `run({page, demo})` | recorded actions; use kit mouse/keyboard, no app API calls |
-| `setup()` | optional off-camera setup of fresh test data, including retakes |
+| `setup({log})` | optional off-camera setup of fresh test data, including retakes; `log("queue PM9 ready")` adds a progress line |
 | `login(page)` | optional off-camera login; read credentials from environment |
 | `verify()` | optional read-only outcome check; returns exactly `true` to proceed |
 | `redact` | extra sensitive text/selectors; stays enabled |
@@ -33,6 +33,63 @@ redaction text and credentials from env. The runner persists selected phase meta
 never the config object, login storage or app error text.
 The kit keeps new login state in memory; it no longer writes `_auth-state.json` beside
 recordings. Custom callers can still read an explicitly supplied existing state path.
+
+## Storyboard before recording
+
+```sh
+node <skill>/scripts/run-case.cjs <work>/case.cjs --storyboard   # same as: node <skill>/scripts/storyboard.cjs <work>/case.cjs
+```
+
+This runs the case's own `run()` with a fake `page` and a fake `demo`. It never runs
+`setup()`, `login()` or `verify()`, opens no browser and uses no data. It prints a Markdown
+table: each caption starts a scene; clicks, scans, highlights, cards and waits are listed
+under it with estimated seconds (kit pacing; `waitApp` = 0.6 s as after editing; pauses
+≤ 2.5 s). It saves `<stem>.storyboard.md` and `<stem>.storyboard.json`; the runner then
+numbers progress lines `STEP n/N` if the case file is unchanged.
+
+Limits:
+- Values read from the page (`innerText()`, `count()`) show as `‹live: …›`.
+- Branches on live state take the "nothing found" path.
+- A loop that waits on page state stops after 5000 calls and is marked "incomplete".
+- Non-page code inside `run()`, such as DB queries or file writes, still runs, so keep side
+  effects out of `run()`.
+- The length is an estimate; trust it to ±30 %.
+
+## Progress, watching and failures
+
+Every run rewrites `<stem>.progress.log` with timestamped lines: `RUN pid=… at=…`, `TAKE`,
+`SETUP …`, `REC`, `STEP <caption>` for each caption, `VERIFY`, `EDIT`, `SHOT <fail.png>`, and finally
+`DONE …` or `FAIL <phase>: <reason>`. The reason is the error's first two lines, with colour
+codes, values of env vars named like `*PASS*|*TOKEN*|*SECRET*|*KEY*|*AUTH*|*COOKIE*|*CRED*`,
+and `redact.text` removed. It stays in this local log and stderr, never in `.job.json`.
+Keep the log out of commits and shared folders anyway.
+
+```sh
+node <skill>/scripts/watch-case.cjs demo-out/example.mp4 --stall 180 [--since 120]
+```
+
+The watcher prints the new lines and exits 0 on `DONE`, 1 on `FAIL`, 2 on `DEAD` (the runner
+pid is gone without either). It prints `STALL` every `--stall` seconds of silence and keeps
+watching. Runs that started more than `--since` seconds before the watcher are ignored, so an
+old log never ends the watch early.
+
+The runner always exits itself, even when case code leaves a browser or socket open. Before
+this fix, a `setup()` that opened its own browser and then threw kept Node alive for hours. On a
+failure during recording it saves `take-N/fail.png` from the filmed page.
+
+`demo.click`, `demo.highlight` and `demo.highlightText` check what is really on top at the
+target. A modal, backdrop, toast or sticky bar counts as a cover. The kit waits up to 3 s
+(fast-forwarded) for it to go, then throws:
+- `click target is covered by <tag#id.class>`
+- `highlight "<label>": the target is behind <tag#id.class>`
+- `highlightText "<text>": the text is behind …`
+
+`highlightText` prefers a visible copy of the text, e.g. the same number shown inside the
+open modal. Kit overlays and xterm's own layers never count as covers.
+
+`--setup-only` runs only `setup()` (no job record, no take) to rehearse data creation. Setup
+can still consume data. A failed `setup()` during a take leaves `stage: "setup-failed"`. The
+next plain run repeats the same take number; the 3rd setup failure stops the runner.
 
 ## Resume safely
 

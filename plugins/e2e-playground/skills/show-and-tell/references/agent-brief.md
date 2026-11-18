@@ -69,6 +69,9 @@ FLOWS.md turns out wrong — then fix that line (others read it too) and carry o
 Prefer `run-case.cjs`: its `.job.json` checkpoints recording, verification and editing.
 For a custom recorder, update one equivalent checkpoint at phase boundaries, not every
 click. Include files, consumed data and the exact next step. Do not duplicate status files.
+Before the take, run `run-case.cjs <case> --storyboard`. Report its table if it differs from the agreed story.
+Run every take in the background together with `watch-case.cjs <output>.mp4`. Act on `FAIL`, `STALL` or `DEAD` at once,
+never wait for a notice that may not come. Never delete `.job.json`/`.lock` to reset a counter: report instead.
 
 ## Save tokens
 - Explore with text (`innerText`, `ariaSnapshot`) before screenshots; keep screenshots

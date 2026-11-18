@@ -140,3 +140,82 @@ for (const method of ["recordCard", "startSession"]) {
     assert.equal(playwright.closed, 1);
   });
 }
+
+test("setup failure re-uses the take, is capped separately and keeps app text out of the job", async t => {
+  const f = fixture(t);
+  f.config.setup = async () => { f.events.push("setup"); throw new Error("setup private detail"); };
+  for (let i = 1; i <= 3; i++) {
+    await assert.rejects(runCase(f.config, f.options), /setup private detail/);
+    const job = JSON.parse(fs.readFileSync(path.join(f.root, "final.job.json"), "utf8"));
+    assert.equal(job.record.attempts, 1);
+    assert.equal(job.record.stage, "setup-failed");
+    assert.equal(job.record.setupFailures, i);
+    assert.ok(!JSON.stringify(job).includes("private"));
+  }
+  await assert.rejects(runCase(f.config, f.options), /setup failed 3 times/);
+  assert.ok(!f.events.includes("card"));
+});
+
+test("a setup retry that succeeds records take 1 without --retake", async t => {
+  const f = fixture(t);
+  let fail = true;
+  f.config.setup = async () => { f.events.push("setup"); if (fail) throw new Error("flaky"); };
+  await assert.rejects(runCase(f.config, f.options), /flaky/);
+  fail = false;
+  await runCase(f.config, f.options);
+  const job = JSON.parse(fs.readFileSync(path.join(f.root, "final.job.json"), "utf8"));
+  assert.equal(job.record.attempts, 1);
+  assert.equal(job.record.stage, "recorded");
+  await runCase(f.config, { ...f.options, retake: true }); // the real second take is still available
+});
+
+test("setup-only rehearses setup without using a take", async t => {
+  const f = fixture(t);
+  assert.deepEqual(await runCase(f.config, { ...f.options, setupOnly: true }), { setup: "ok" });
+  assert.deepEqual(f.events, ["setup"]);
+  assert.ok(!fs.existsSync(path.join(f.root, "final.job.json")));
+  await assert.rejects(runCase(f.config, { ...f.options, setupOnly: true, retake: true }), /choose one/);
+});
+
+test("progress log streams phases and captions, and a scrubbed failure reason", async t => {
+  const f = fixture(t);
+  const startSession = f.kit.startSession;
+  f.kit.startSession = async options => ({ ...(await startSession(options)), demo: { caption: async () => {} } });
+  f.config.run = async ({ demo }) => { await demo.caption("Forklift lifts pallet 1"); await demo.caption(null); };
+  f.config.setup = async ({ log }) => log("queue PM9 ready");
+  await runCase(f.config, f.options);
+  const text = fs.readFileSync(path.join(f.root, "final.progress.log"), "utf8");
+  for (const want of [/ RUN pid=\d+ at=\d+/, / TAKE 1 of 2/, / SETUP queue PM9 ready/, / STEP 1 Forklift lifts pallet 1/, / DONE /])
+    assert.match(text, want);
+  assert.equal((text.match(/ STEP /g) || []).length, 1, "hiding a caption is not a step");
+
+  process.env.DEMO_TEST_PASSWORD = "hunter2-secret";
+  t.after(() => { delete process.env.DEMO_TEST_PASSWORD; });
+  f.config.run = async () => { throw new Error("login failed for hunter2-secret as Jane Doe\nsecond line\nthird line"); };
+  f.config.redact = { text: ["Jane Doe"] };
+  await assert.rejects(runCase(f.config, { ...f.options, retake: true }));
+  const failed = fs.readFileSync(path.join(f.root, "final.progress.log"), "utf8");
+  assert.match(failed, / FAIL recording: login failed for \[redacted\] as \[redacted\] \| second line\n/);
+  assert.ok(!failed.includes("hunter2") && !failed.includes("Jane") && !failed.includes("third line"));
+});
+
+test("CLI exits even when setup leaves a handle open, with a readable reason", t => {
+  const { spawnSync } = require("node:child_process");
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "demo runner cli "));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const caseFile = path.join(root, "case.cjs");
+  fs.writeFileSync(caseFile, `module.exports = {
+    output: "out/final.mp4", baseURL: "http://127.0.0.1:9", title: { title: "T", lines: [] },
+    run: async () => {},
+    setup: async () => { setInterval(() => {}, 1000); throw new Error("select did not stick for " + process.env.DEMO_PASSWORD); },
+  };`);
+  const started = Date.now();
+  const result = spawnSync(process.execPath, [path.join(__dirname, "..", "run-case.cjs"), caseFile],
+    { encoding: "utf8", timeout: 20000, env: { ...process.env, DEMO_PASSWORD: "s3cret-pw" } });
+  assert.equal(result.error, undefined, "runner must exit by itself");
+  assert.ok(Date.now() - started < 15000);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /case failed: select did not stick for \[redacted\]/);
+  assert.ok(!result.stderr.includes("s3cret-pw"));
+  assert.match(fs.readFileSync(path.join(root, "out", "final.progress.log"), "utf8"), / FAIL setup: select did not stick/);
+});
